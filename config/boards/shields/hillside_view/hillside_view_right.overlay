@@ -6,6 +6,10 @@
 
 #include "hillside_view.dtsi"
 
+&default_transform {
+  col-offset = <6>;
+};
+
 &kscan0 {
   col-gpios
     = <&pro_micro 10 GPIO_ACTIVE_HIGH>
