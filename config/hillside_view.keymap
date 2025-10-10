@@ -157,7 +157,7 @@
 &kp LC(LS(Z))  &kp EXCL      &kp AT     &kp HASH       &kp DLLR          &kp PRCNT           &kp ASTERISK  &kp NUMBER_7  &kp NUMBER_8  &kp NUMBER_9  &kp SLASH   &kp PERCENT
 &kp LC(LS(V))  &kp QUESTION  &kp MINUS  &kp PLUS       &kp EQUAL         &kp UNDERSCORE      &kp NUMBER_0  &kp NUMBER_4  &kp N5        &kp NUMBER_6  &kp PERIOD  &kp EQUAL
 &kp LC(X)      &kp TILDE     &kp GRAVE  &kp LESS_THAN  &kp GREATER_THAN  &kp DELETE          &kp PLUS      &kp NUMBER_1  &kp NUMBER_2  &kp NUMBER_3  &kp MINUS   &kp CARET
-                                        &kp BACKSPACE                                                                    &tog 1
+                                        &kp BACKSPACE                                                                    &trans
                &trans        &kp ENTER  &trans         &trans                                              &trans        &trans        &trans        &trans
             >;
 
@@ -168,10 +168,10 @@
             display-name = "Navigation";
             bindings = <
 &kp LC(Z)  &kp CARET  &kp AMPERSAND  &kp ASTERISK       &kp LEFT_BRACE        &kp RIGHT_BRACE            &msc SCRL_UP    &kp HOME       &kp UP       &kp END    &kp INSERT       &kp LC(W)
-&kp LC(V)  &kp COLON  &kp SQT        &kp DOUBLE_QUOTES  &kp LEFT_PARENTHESIS  &kp RIGHT_PARENTHESIS      &msc SCRL_DOWN  &kp LEFT       &kp DOWN     &kp RIGHT  &mkp RCLK        &kp LC(TAB)
-&kp LC(C)  &kp BSLH   &kp PIPE       &kp FSLH           &kp LBKT              &kp RBKT                   &mkp LCLK       &kp PAGE_DOWN  &kp PAGE_UP  &mkp RCLK  &kp PRINTSCREEN  &kp LS(LC(TAB))
-                                     &tog 2                                                                                             &mkp MCLK
-           &trans     &trans         &trans             &trans                                                           &trans         &trans       &trans     &trans
+&kp LC(V)  &kp COLON  &kp SQT        &kp DOUBLE_QUOTES  &kp LEFT_PARENTHESIS  &kp RIGHT_PARENTHESIS      &msc SCRL_DOWN  &kp LEFT       &kp DOWN     &kp RIGHT  &kp UP_ARROW     &kp LC(TAB)
+&kp LC(C)  &kp BSLH   &kp PIPE       &kp FSLH           &kp LBKT              &kp RBKT                   &mkp LCLK       &kp PAGE_DOWN  &kp PAGE_UP  &mkp MCLK  &kp PRINTSCREEN  &kp LS(LC(TAB))
+                                     &trans                                                                                             &mkp MCLK
+           &trans     &trans         &trans             &trans                                                           &trans         &trans       &mkp RCLK  &trans
             >;
 
             sensor-bindings = <&inc_dec_kp HOME END &inc_dec_kp C_NEXT C_PREV>;
@@ -195,11 +195,11 @@
         game_layer {
             display-name = "Gaming";
             bindings = <
-&kp DEL    &kp Q       &kp W     &kp E      &kp R        &kp T      &kp Y  &kp K   &kp I      &kp O          &kp P          &kp PRINTSCREEN
-&kp TAB    &kp A       &kp S     &kp D      &kp F        &kp G      &kp H  &kp J   &kp K      &kp L          &kp SEMICOLON  &kp END
-&kp LSHFT  &kp Z       &kp X     &kp C      &kp V        &kp B      &kp N  &kp M   &kp COMMA  &kp DOT        &kp FSLH       &kp HOME
-                                 &kp ESC                                           &to 0
-           &kp INSERT  &kp LALT  &kp LCTRL  &lt 1 SPACE                    &tog 2  &kp ENTER  &kp BACKSPACE  &kp DELETE
+&kp DEL    &kp Q       &kp W     &kp E      &kp R        &kp T      &kp Y  &kp K  &kp I      &kp O          &kp P          &kp PRINTSCREEN
+&kp TAB    &kp A       &kp S     &kp D      &kp F        &kp G      &kp H  &kp J  &kp K      &kp L          &kp SEMICOLON  &kp END
+&kp LSHFT  &kp Z       &kp X     &kp C      &kp V        &kp B      &kp N  &kp M  &kp COMMA  &kp DOT        &kp FSLH       &kp HOME
+                                 &kp ESC                                          &to 0
+           &kp INSERT  &kp LALT  &kp LCTRL  &lt 1 SPACE                    &mo 2  &kp ENTER  &kp BACKSPACE  &kp RGUI
             >;
 
             sensor-bindings =
