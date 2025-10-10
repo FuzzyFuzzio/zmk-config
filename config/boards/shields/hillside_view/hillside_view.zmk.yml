@@ -10,7 +10,6 @@ exposes:
 features:
   - keys
   - display
-  - underglow
 siblings:
   - hillside_view_left
   - hillside_view_right
