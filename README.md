@@ -19,15 +19,3 @@ Made with https://nickcoutsos.github.io/keymap-editor/
 ![layer2](./assets/layer2.png)
 ![layer3](./assets/layer3.png)
 ![layer4](./assets/layer4.png)
-![layer5](./assets/layer5.png)
-
-## Corne
-
-![Corne LP](./assets/corne.webp)
-
-Config is located on the [corne branch](https://github.com/mike1808/zmk-config/tree/corne).
-I have removed it from the main branch since I was not using it.
-
-## Charybdis
-
-Charybdis 4x6 with a trackball running pwm3360. 
