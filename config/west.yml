@@ -6,6 +6,8 @@ manifest:
       url-base: https://github.com/badjeff
     - name: carrefinho
       url-base: https://github.com/carrefinho
+    - name: m165437
+      url-base: https://github.com/M165437
   projects:
     # - name: zmk
     #   remote: zmkfirmware
@@ -23,6 +25,12 @@ manifest:
       revision: main
     - name: prospector-zmk-module
       remote: badjeff
+      revision: main
+    - name: prospector-zmk-module
+      remote: badjeff
+      revision: main
+    - name: nice-view-gem
+      remote: m165437
       revision: main
   self:
     path: config
