@@ -7,14 +7,14 @@ manifest:
     - name: infely
       url-base: https://github.com/infely
   projects:
-    - name: zmk
-      remote: zmkfirmware
-      revision: main
-      import: app/west.yml
     # - name: zmk
-    #   remote: badjeff
-    #   revision: feat/pointers-move-scroll
-    #   import: app/west.yml
+    #  remote: zmkfirmware
+    #  revision: main
+    #  import: app/west.yml
+    - name: zmk
+      remote: badjeff
+      revision: feat/pointers-move-scroll
+      import: app/west.yml
     - name: zmk-adns9800-driver
       remote: badjeff
       revision: main
