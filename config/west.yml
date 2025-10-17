@@ -4,6 +4,8 @@ manifest:
       url-base: https://github.com/zmkfirmware
     - name: badjeff
       url-base: https://github.com/badjeff
+    - name: infely
+      url-base: https://github.com/infely
   projects:
     # - name: zmk
     #   remote: zmkfirmware
@@ -55,5 +57,8 @@ manifest:
     - name: cirque-input-module
       remote: badjeff
       revision: main
+    - name: nice-view-battery
+      remote: infely
+      revision: main 
   self:
     path: config
