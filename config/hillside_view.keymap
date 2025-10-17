@@ -131,7 +131,7 @@
         compatible = "zmk,keymap";
 
         default_layer {
-            display-name = "Default";
+            display-name = " ";
             bindings = <
 &kp LC(Z)  &kp Q                 &kp W           &kp E        &kp R              &kp T      &kp Y  &kp U               &kp I        &kp O           &kp P               &kp C_PREV
 &kp LC(V)  &ht LGUI A            &ht LEFT_ALT S  &ht LCTRL D  &htb LEFT_SHIFT F  &kp G      &kp H  &htb RIGHT_SHIFT J  &ht RCTRL K  &ht LEFT_ALT L  &ht RGUI SEMICOLON  &kp C_PLAY_PAUSE
@@ -157,26 +157,26 @@
         };
 
         right_layer {
-            display-name = "Navigation";
+            display-name = "Mouse";
             bindings = <
-&kp LC(Z)  &kp CARET  &kp AMPERSAND  &kp ASTERISK       &kp LEFT_BRACE        &kp RIGHT_BRACE            &msc SCRL_UP    &kp HOME       &kp UP       &kp END    &kp INSERT       &kp LC(W)
-&kp LC(V)  &kp COLON  &kp SQT        &kp DOUBLE_QUOTES  &kp LEFT_PARENTHESIS  &kp RIGHT_PARENTHESIS      &msc SCRL_DOWN  &kp LEFT       &kp DOWN     &kp RIGHT  &kp UP_ARROW     &kp LC(TAB)
-&kp LC(C)  &kp BSLH   &kp PIPE       &kp FSLH           &kp LBKT              &kp RBKT                   &mkp LCLK       &kp PAGE_DOWN  &kp PAGE_UP  &mkp MCLK  &kp PRINTSCREEN  &kp LS(LC(TAB))
-                                     &trans                                                                                             &mkp MCLK
-           &trans     &trans         &trans             &trans                                                           &trans         &trans       &mkp RCLK  &trans
+&kp LC(Z)  &kp CARET  &kp AMPERSAND  &kp ASTERISK       &kp LEFT_BRACE        &kp RIGHT_BRACE            &mkp RCLK  &kp HOME       &kp UP       &kp END    &kp INSERT       &kp LC(W)
+&kp LC(V)  &kp COLON  &kp SQT        &kp DOUBLE_QUOTES  &kp LEFT_PARENTHESIS  &kp RIGHT_PARENTHESIS      &mkp MCLK  &kp LEFT       &kp DOWN     &kp RIGHT  &kp UP_ARROW     &kp LC(TAB)
+&kp LC(C)  &kp BSLH   &kp PIPE       &kp FSLH           &kp LBKT              &kp RBKT                   &mkp LCLK  &kp PAGE_DOWN  &kp PAGE_UP  &kp HOME   &kp PRINTSCREEN  &kp LS(LC(TAB))
+                                     &trans                                                                                        &mkp MCLK
+           &trans     &trans         &trans             &trans                                                      &trans         &trans       &mkp RCLK  &trans
             >;
 
             sensor-bindings = <&inc_dec_kp HOME END &inc_dec_kp C_NEXT C_PREV>;
         };
 
         func_layer {
-            display-name = "Functions";
+            display-name = "Function";
             bindings = <
-&trans  &kp F9       &kp F10     &kp F11  &kp F12  &trans      &bt BT_CLR  &trans        &trans        &trans        &trans        &trans
-&trans  &kp F5       &kp F6      &kp F7   &kp F8   &trans      &trans      &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4
-&trans  &kp F1       &kp F2      &kp F3   &kp F4   &trans      &trans      &trans        &trans        &trans        &trans        &trans
-                                 &trans                                                  &trans
-        &bootloader  &sys_reset  &trans   &trans                           &trans        &trans        &sys_reset    &bootloader
+&trans  &kp F9  &kp F10  &kp F11  &kp F12  &studio_unlock      &bt BT_CLR  &trans        &trans        &trans        &trans        &trans
+&trans  &kp F5  &kp F6   &kp F7   &kp F8   &trans              &trans      &bt BT_SEL 0  &bt BT_SEL 1  &bt BT_SEL 2  &bt BT_SEL 3  &bt BT_SEL 4
+&trans  &kp F1  &kp F2   &kp F3   &kp F4   &trans              &trans      &trans        &trans        &trans        &trans        &trans
+                         &trans                                                          &trans
+        &trans  &trans   &trans   &trans                                   &trans        &trans        &trans        &trans
             >;
 
             // F15 and F14 are brightness controls for macOS
@@ -185,7 +185,7 @@
         };
 
         game_layer {
-            display-name = "Gaming";
+            display-name = "Game";
             bindings = <
 &kp DEL    &kp Q       &kp W     &kp E      &kp R        &kp T      &kp Y  &kp U  &kp I      &kp O          &kp P          &kp PRINTSCREEN
 &kp TAB    &kp A       &kp S     &kp D      &kp F        &kp G      &kp H  &kp J  &kp K      &kp L          &kp SEMICOLON  &kp END
