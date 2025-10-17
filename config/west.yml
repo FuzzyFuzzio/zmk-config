@@ -4,6 +4,8 @@ manifest:
       url-base: https://github.com/zmkfirmware
     - name: badjeff
       url-base: https://github.com/badjeff
+    - name: infely
+      url-base: https://github.com/infely
   projects:
     # - name: zmk
     #   remote: zmkfirmware
