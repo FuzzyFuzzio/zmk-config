@@ -21,8 +21,8 @@
 #endif
 
 #define DEF 0
-#define SYM 1
-#define NUM 2
+#define NUM 1
+#define SYM 2
 #define ADJ 3
 #define QUICK_TAP_MS 175
 #define TAPPING_TERM_MS 150
