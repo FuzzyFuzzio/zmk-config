@@ -48,7 +48,7 @@
     tpad_peripheral_listener {
         compatible = "zmk,input-behavior-listener";
         device = <&glidepoint1>;
-        layers = <DEF SYM ADJ>;
+        layers = <DEF NUM ADJ>;
         y-invert;
         scale-multiplier = <2>;
 
