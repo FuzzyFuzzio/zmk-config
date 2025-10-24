@@ -23,7 +23,7 @@
 #define NUM 1
 #define SYM 2
 #define ADJ 3
-#define QUICK_TAP_MS 175
+#define QUICK_TAP_MS 200
 #define TAPPING_TERM_MS 150
 
 &sk {
@@ -62,7 +62,7 @@
     tpad_peripheral_scroll {
         compatible = "zmk,input-behavior-listener";
         device = <&glidepoint1>;
-        layers = <NUM>;
+        layers = <SYM>;
 
         /* NOTE: only apply input-code overriding for INPUT_EV_REL */
 
@@ -105,8 +105,8 @@
         ht: hold_tap {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
-            tapping-term-ms = <300>;
-            quick-tap-ms = <175>;
+            tapping-term-ms = <400>;
+            quick-tap-ms = <200>;
             flavor = "tap-preferred";
             bindings = <&kp>, <&kp>;
 
@@ -119,8 +119,8 @@
             bindings = <&kp>, <&kp>;
 
             #binding-cells = <2>;
-            tapping-term-ms = <200>;
-            quick-tap-ms = <175>;
+            tapping-term-ms = <300>;
+            quick-tap-ms = <200>;
             flavor = "balanced";
         };
     };
