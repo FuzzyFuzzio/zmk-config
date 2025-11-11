@@ -1,0 +1,29 @@
+/*
+ * Central dongle overlay for nrf52840_mdk_usb_dongle
+ */
+
+/ {
+    /* Virtual device for left side relay resurrection (channel 101) */
+    glidepoint_left: virtual_input {
+        compatible = "zmk,virtual-input";
+    };
+
+    /* Virtual device for right side relay resurrection (channel 102) */
+    glidepoint_right: virtual_input {
+        compatible = "zmk,virtual-input";
+    };
+
+    /* Match relay channel from left peripheral overlay (101) */
+    input_relay_config_101_central {
+        compatible = "zmk,split-peripheral-input-relay";
+        relay-channel = <101>;
+        device = <&glidepoint_left>;
+    };
+
+    /* Match relay channel from right peripheral overlay (102) */
+    input_relay_config_102_central {
+        compatible = "zmk,split-peripheral-input-relay";
+        relay-channel = <102>;
+        device = <&glidepoint_right>;
+    };
+};

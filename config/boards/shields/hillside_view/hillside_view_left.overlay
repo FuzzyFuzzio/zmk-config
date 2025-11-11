@@ -36,23 +36,20 @@
   status = "okay";
 };
 
+/* Left half now pure peripheral when using external dongle; relay mapping handled on dongle. */
+/* Add virtual input + relay config so keymap bindings can reference a glidepoint on left side too. */
+
 / {
-    /* define virtual input, will be resurrected for emitting input event */
-	/* NOTE: set `device = <&glidepoint1>` in `zmk,input-listener` */
-	glidepoint1: virtual_input {
-		compatible = "zmk,virtual-input";
-	};
+  /* THIS only makes keymap binding happy on peripheral side; left half has no physical glidepoint hardware. */
+  glidepoint1: virtual_input {
+    compatible = "zmk,virtual-input";
+  };
 
-	/* for central side, define (relay-channel)-to-(virtual-input) mapping */
-	input_relay_config_102 {
-		compatible = "zmk,split-peripheral-input-relay";
-		
-		/* channel id, used to filter incoming input event from split peripheral */
-		/* NOTE: should matching relay-channel on peripheral overlay */
-		relay-channel = <102>;
-
-		/* virtual input device on central, which used to emit input event as an agent device */
-		device = <&glidepoint1>;
-	};
+  /* Distinct relay channel (101) from right side (102). */
+  input_relay_config_101 {
+    compatible = "zmk,split-peripheral-input-relay";
+    device = <&glidepoint1>;
+    relay-channel = <101>;
+  };
 };
 

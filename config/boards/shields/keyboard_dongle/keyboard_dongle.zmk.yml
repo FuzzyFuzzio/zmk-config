@@ -1,0 +1,10 @@
+file_format: "1"
+id: keyboard_dongle
+name: Keyboard Dongle
+type: shield
+requires:
+  - nrf52840_mdk_usb_dongle
+features:
+  - bluetooth
+  - usb
+# This is a virtual/aggregate central side that relays HID over dongle.
