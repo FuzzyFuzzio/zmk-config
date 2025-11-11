@@ -2,6 +2,8 @@
  * Provides a 1x1 dummy matrix transform so ZMK can compile firmware without a physical matrix.
  */
 
+#include <dt-bindings/zmk/matrix_transform.h>
+
 / {
     chosen {
         zmk,matrix_transform = &dongle_transform;
