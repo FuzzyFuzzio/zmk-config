@@ -14,4 +14,8 @@ config ZMK_SPLIT_ROLE_CENTRAL
 config ZMK_USB
     default y
 
+# Define peripheral count for split BLE relay module
+config ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
+    default 2
+
 endif # SHIELD_KEYBOARD_DONGLE
