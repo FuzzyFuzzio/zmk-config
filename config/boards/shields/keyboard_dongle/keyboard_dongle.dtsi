@@ -1,0 +1,16 @@
+/* Minimal DTSI for keyboard_dongle to satisfy ZMK matrix/keymap requirements.
+ * Provides a 1x1 dummy matrix transform so ZMK can compile firmware without a physical matrix.
+ */
+
+/ {
+    chosen {
+        zmk,matrix_transform = &dongle_transform;
+    };
+
+    dongle_transform: keymap_transform_0 {
+        compatible = "zmk,matrix-transform";
+        columns = <1>;
+        rows = <1>;
+        map = <RC(0,0)>;
+    };
+};

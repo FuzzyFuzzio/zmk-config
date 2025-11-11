@@ -1,0 +1,11 @@
+// Minimal keymap for keyboard_dongle so build doesn't warn about missing keymap.
+// Single layer with two utility behaviors (reset & bluetooth advertise) if available.
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+        default_layer {
+            bindings = <&kp NO &bootloader>;
+        };
+    };
+};
