@@ -1,18 +1,33 @@
 # Copyright (c) 2022 The ZMK Contributors
 # SPDX-License-Identifier: MIT
 
-if SHIELD_HILLSIDE_VIEW_LEFT
+if SHIELD_HSV_DONGLE
 
 config ZMK_KEYBOARD_NAME
     default "Hillside View"
 
-config ZMK_SPLIT_ROLE_CENTRAL
+config CONFIG_BT
     default y
 
-config ZMK_USB
+config CONFIG_BT_HCI_VS_EXT
     default y
 
-endif # SHIELD_HILLSIDE_VIEW_LEFT
+config CONFIG_USB
+    default y
+
+config CONFIG_USB_DEVICE_STACK
+    default y
+
+config CONFIG_USB_HID
+    default y
+
+config CONFIG_BT_BONDABLE
+    default y
+
+config CONFIG_BT_SETTINGS
+    default y
+
+endif # SHIELD_HSV_DONGLE
 
 if SHIELD_HILLSIDE_VIEW_LEFT || SHIELD_HILLSIDE_VIEW_RIGHT
 
