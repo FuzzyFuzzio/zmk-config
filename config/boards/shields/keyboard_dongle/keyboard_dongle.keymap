@@ -5,7 +5,8 @@
     keymap {
         compatible = "zmk,keymap";
         default_layer {
-            bindings = <&none>;
+            /* Single dummy key for 1x1 matrix; uses standard keypress behavior */
+            bindings = <&kp A>;
         };
     };
 };
