@@ -1,12 +1,15 @@
 // Minimal keymap for keyboard_dongle so build doesn't warn about missing keymap.
-// Single layer with two utility behaviors (reset & bluetooth advertise) if available.
+// Include key and behavior bindings definitions.
+
+#include <dt-bindings/zmk/keys.h>
+#include <behaviors.dtsi>
 
 / {
     keymap {
         compatible = "zmk,keymap";
         default_layer {
-            /* Single dummy key for 1x1 matrix; uses standard keypress behavior */
-            bindings = <&kp A>;
+            /* Single dummy key triggers bootloader */
+            bindings = <&bootloader>;
         };
     };
 };
