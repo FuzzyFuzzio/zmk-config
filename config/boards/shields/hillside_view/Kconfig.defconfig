@@ -6,12 +6,6 @@ if SHIELD_HILLSIDE_VIEW_LEFT
 config ZMK_KEYBOARD_NAME
     default "Hillside View"
 
-config ZMK_SPLIT_ROLE_PERIPHERAL
-    default y
-
-config ZMK_USB
-    default y
-
 endif # SHIELD_HILLSIDE_VIEW_LEFT
 
 if SHIELD_HILLSIDE_VIEW_LEFT || SHIELD_HILLSIDE_VIEW_RIGHT
