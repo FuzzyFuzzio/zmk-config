@@ -6,3 +6,6 @@ config SHIELD_HILLSIDE_VIEW_LEFT
 
 config SHIELD_HILLSIDE_VIEW_RIGHT
     def_bool $(shields_list_contains,hillside_view_right)
+
+config SHIELD_HSV_DONGLE
+    def_bool $(shields_list_contains,hillside_view_dongle)
