@@ -19,3 +19,5 @@ include:
     shield: hillside_view_right nice_view_battery
   - board: nice_nano_v2
     shield: settings_reset
+  - board: nrf52840dk_nrf52840  
+    shield: hillside_view_dongle
