@@ -42,9 +42,10 @@ manifest:
     - name: zmk-hid-io
       remote: badjeff
       revision: main
-    - name: zmk-split-peripheral-input-relay
-      remote: badjeff
-      revision: main
+    # Relay module deprecated - ZMK PR #2477 provides native split input support
+    # - name: zmk-split-peripheral-input-relay
+    #   remote: badjeff
+    #   revision: main
     - name: zmk-split-peripheral-output-relay
       remote: badjeff
       revision: main

@@ -36,20 +36,25 @@
   status = "okay";
 };
 
-/* Left half now pure peripheral when using external dongle; relay mapping handled on dongle. */
-/* Add virtual input + relay config so keymap bindings can reference a glidepoint on left side too. */
+/* Left half now pure peripheral when using external dongle */
+/* Native ZMK split input support - peripheral sends virtual input to central */
 
 / {
-  /* THIS only makes keymap binding happy on peripheral side; left half has no physical glidepoint hardware. */
+  /* Virtual input device for the left side (sent to dongle via split input) */
   glidepoint1: virtual_input {
     compatible = "zmk,virtual-input";
   };
 
-  /* Distinct relay channel (101) from right side (102). */
-  input_relay_config_101 {
-    compatible = "zmk,split-peripheral-input-relay";
-    device = <&glidepoint1>;
-    relay-channel = <101>;
+  /* Split input configuration - connects virtual device to split transport */
+  split_inputs {
+    #address-cells = <1>;
+    #size-cells = <0>;
+
+    glidepoint_split_left: glidepoint_split@0 {
+      compatible = "zmk,input-split";
+      reg = <0>; /* Must match central's glidepoint_left reg value */
+      device = <&glidepoint1>;
+    };
   };
 };
 

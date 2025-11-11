@@ -3,27 +3,32 @@
 #include "keyboard_dongle.dtsi"
 
 / {
-    /* Virtual device for left side relay resurrection (channel 101) */
-    glidepoint_left: virtual_input_left {
-        compatible = "zmk,virtual-input";
+    /* Native ZMK split input support - central side receives input from peripherals */
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        /* Split device for left peripheral virtual input (reg 0) */
+        glidepoint_left: glidepoint_left@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+
+        /* Split device for right peripheral glidepoint (reg 1) */
+        glidepoint_right: glidepoint_right@1 {
+            compatible = "zmk,input-split";
+            reg = <1>;
+        };
     };
 
-    /* Virtual device for right side relay resurrection (channel 102) */
-    glidepoint_right: virtual_input_right {
-        compatible = "zmk,virtual-input";
-    };
-
-    /* Match relay channel from left peripheral overlay (101) */
-    input_relay_config_101_central {
-        compatible = "zmk,split-peripheral-input-relay";
-        relay-channel = <101>;
+    /* Input listeners for HID mouse reports */
+    glidepoint_left_listener {
+        compatible = "zmk,input-listener";
         device = <&glidepoint_left>;
     };
 
-    /* Match relay channel from right peripheral overlay (102) */
-    input_relay_config_102_central {
-        compatible = "zmk,split-peripheral-input-relay";
-        relay-channel = <102>;
+    glidepoint_right_listener {
+        compatible = "zmk,input-listener";
         device = <&glidepoint_right>;
     };
 };

@@ -45,22 +45,20 @@
 };
 
 / {
-    /* THIS only makes keymap binding happy, nothing happens on peripheral side */
+    /* Virtual input device for keymap binding compatibility (left side equivalent) */
 	glidepoint1: virtual_input {
 		compatible = "zmk,virtual-input";
 	};
 
-    input_relay_config_102 {
-        compatible = "zmk,split-peripheral-input-relay";
+    /* Native ZMK split input support - peripheral sends physical glidepoint to central */
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
 
-        /* peripheral side input device, used to... */
-		/*  - be intecepted on peripheral; */
-		/*  - and then, be resurrected as `zmk,virtual-device` on central; */
-        device = <&glidepoint0>;
-
-        /* channel id, used to be be transfered along with all input events. */
-		/* NOTE 1: pick any 8bit integer. (1 - 255) */
-		/* NOTE 2: should matching relay-channel on central overlay */
-		relay-channel = <102>;
+        glidepoint_split_right: glidepoint_split@1 {
+            compatible = "zmk,input-split";
+            reg = <1>; /* Must match central's glidepoint_right reg value */
+            device = <&glidepoint0>; /* Physical Cirque glidepoint */
+        };
     };
 };
