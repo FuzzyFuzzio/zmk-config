@@ -4,12 +4,12 @@
 
 / {
     /* Virtual device for left side relay resurrection (channel 101) */
-    glidepoint_left: virtual_input {
+    glidepoint_left: virtual_input_left {
         compatible = "zmk,virtual-input";
     };
 
     /* Virtual device for right side relay resurrection (channel 102) */
-    glidepoint_right: virtual_input {
+    glidepoint_right: virtual_input_right {
         compatible = "zmk,virtual-input";
     };
 
