@@ -37,24 +37,11 @@
 };
 
 /* Left half now pure peripheral when using external dongle */
-/* Native ZMK split input support - peripheral sends virtual input to central */
 
 / {
-  /* Virtual input device for the left side (sent to dongle via split input) */
+  /* Virtual input device for keymap compatibility only - not actually used for split input */
   glidepoint1: virtual_input {
     compatible = "zmk,virtual-input";
-  };
-
-  /* Split input configuration - connects virtual device to split transport */
-  split_inputs {
-    #address-cells = <1>;
-    #size-cells = <0>;
-
-    glidepoint_split_left: glidepoint_split@0 {
-      compatible = "zmk,input-split";
-      reg = <0>; /* Must match central's glidepoint_left reg value */
-      device = <&glidepoint1>;
-    };
   };
 };
 

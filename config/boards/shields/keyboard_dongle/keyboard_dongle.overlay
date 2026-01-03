@@ -15,12 +15,11 @@
             compatible = "zmk,input-split";
             reg = <1>;
         };
+    };
 
-        /* Split device for left peripheral virtual input (reg 0) - keymap expects glidepoint1 */
-        glidepoint1: glidepoint1@0 {
-            compatible = "zmk,input-split";
-            reg = <0>;
-        };
+    /* Virtual input device for keymap compatibility - left side has no physical input */
+    glidepoint1: virtual_input {
+        compatible = "zmk,virtual-input";
     };
 
     /* Input listener for received pointer events */
