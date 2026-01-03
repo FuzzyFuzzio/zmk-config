@@ -1,24 +1,8 @@
 /* Central dongle overlay for nrf52840_mdk_usb_dongle */
 
 #include "keyboard_dongle.dtsi"
-#include <dt-bindings/zmk/input_transform.h>
 
 / {
-    /* Input processors for pointer transformations */
-    y_inverter: y_inverter {
-        compatible = "zmk,input-processor-invert";
-        #input-processor-cells = <0>;
-        type = <INPUT_EV_REL>;
-        codes = <INPUT_REL_Y>;
-    };
-
-    y_scaler: y_scaler {
-        compatible = "zmk,input-processor-scaler";
-        #input-processor-cells = <1>;
-        type = <INPUT_EV_REL>;
-        codes = <INPUT_REL_Y>;
-    };
-
     /* Native ZMK split input support - central side receives input from peripherals */
     split_inputs {
         #address-cells = <1>;
@@ -28,8 +12,6 @@
         glidepoint0: glidepoint0@1 {
             compatible = "zmk,input-split";
             reg = <1>;
-            /* Input transformations */
-            input-processors = <&y_scaler 2 &y_inverter>;
         };
 
         /* Split device for left peripheral virtual input (reg 0) - keymap expects glidepoint1 */
