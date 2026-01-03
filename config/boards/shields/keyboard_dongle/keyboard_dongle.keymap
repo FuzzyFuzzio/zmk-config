@@ -1,15 +1,5 @@
-// Minimal keymap for keyboard_dongle so build doesn't warn about missing keymap.
-// Include key and behavior bindings definitions.
+// Dongle uses the main hillside_view keymap
+// The dongle acts as a central that relays all key/pointer events from peripherals
 
-#include <dt-bindings/zmk/keys.h>
-#include <behaviors.dtsi>
+#include "../../../hillside_view.keymap"
 
-/ {
-    keymap {
-        compatible = "zmk,keymap";
-        default_layer {
-            /* Single dummy key triggers bootloader */
-            bindings = <&bootloader>;
-        };
-    };
-};

@@ -8,27 +8,16 @@
         #address-cells = <1>;
         #size-cells = <0>;
 
-        /* Split device for left peripheral virtual input (reg 0) */
-        glidepoint_left: glidepoint_left@0 {
-            compatible = "zmk,input-split";
-            reg = <0>;
-        };
-
-        /* Split device for right peripheral glidepoint (reg 1) */
-        glidepoint_right: glidepoint_right@1 {
+        /* Split device for right peripheral glidepoint (reg 1) - keymap expects glidepoint0 */
+        glidepoint0: glidepoint0@1 {
             compatible = "zmk,input-split";
             reg = <1>;
         };
-    };
 
-    /* Input listeners for HID mouse reports */
-    glidepoint_left_listener {
-        compatible = "zmk,input-listener";
-        device = <&glidepoint_left>;
-    };
-
-    glidepoint_right_listener {
-        compatible = "zmk,input-listener";
-        device = <&glidepoint_right>;
+        /* Split device for left peripheral virtual input (reg 0) - keymap expects glidepoint1 */
+        glidepoint1: glidepoint1@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
     };
 };
