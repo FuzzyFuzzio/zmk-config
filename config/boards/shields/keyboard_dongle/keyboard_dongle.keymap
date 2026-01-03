@@ -1,5 +1,43 @@
-// Dongle uses the main hillside_view keymap
-// The dongle acts as a central that relays all key/pointer events from peripherals
+// Dongle keymap - uses hillside_view layers but without input listeners
+// Input listeners are only on peripherals where physical devices exist
+
+#include <dt-bindings/zmk/mouse.h>
+#include <behaviors/mouse_keys.dtsi>
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/keys.h>
+
+// Import defines and behaviors from main keymap
+#ifndef LB5
+#define LB5 24
+#endif
+
+#ifndef RB5
+#define RB5 35
+#endif
+
+#define DEF 0
+#define NUM 1
+#define SYM 2
+#define ADJ 3
+#define QUICK_TAP_MS 200
+#define TAPPING_TERM_MS 150
+
+&sk {
+    release-after-ms = <600>;
+    quick-release;
+};
+
+// Note: Input listeners for glidepoint0/glidepoint1 are NOT included here
+// They exist on the peripherals where the physical devices are located
+// The dongle receives already-processed input events via split protocol
 
 #include "../../../hillside_view.keymap"
+
+// Override: Remove the input listener nodes that reference physical devices
+/ {
+    /delete-node/ tpad_central_listener;
+    /delete-node/ tpad_peripheral_listener;
+    /delete-node/ mmv_ibl;
+};
 
