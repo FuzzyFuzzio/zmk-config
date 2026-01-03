@@ -20,4 +20,16 @@
             reg = <0>;
         };
     };
+
+    /* Input listeners to process received split input events */
+    input_listeners {
+        compatible = "zmk,input-listeners";
+
+        tpad_listener {
+            compatible = "zmk,input-behavior-listener";
+            device = <&glidepoint0>;
+            y-invert;
+            scale-multiplier = <2>;
+        };
+    };
 };
