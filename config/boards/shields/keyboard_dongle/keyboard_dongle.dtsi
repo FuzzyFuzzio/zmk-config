@@ -6,7 +6,14 @@
 
 / {
     chosen {
+        zmk,kscan = &kscan0;
         zmk,matrix_transform = &dongle_transform;
+    };
+
+    kscan0: kscan {
+        compatible = "zmk,kscan-gpio-direct";
+        wakeup-source;
+        input-gpios = <&gpio0 0 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
     };
 
     dongle_transform: keymap_transform_0 {
