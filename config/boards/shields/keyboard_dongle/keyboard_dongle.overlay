@@ -20,4 +20,19 @@
             reg = <0>;
         };
     };
+
+    /* Input listeners to convert split pointer events to HID mouse reports */
+    tpad_central_listener {
+        compatible = "zmk,input-behavior-listener";
+        device = <&glidepoint0>;
+        y-invert;
+        scale-multiplier = <2>;
+    };
+
+    tpad_peripheral_listener {
+        compatible = "zmk,input-behavior-listener";
+        device = <&glidepoint1>;
+        y-invert;
+        scale-multiplier = <2>;
+    };
 };
