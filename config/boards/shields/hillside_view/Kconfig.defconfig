@@ -6,19 +6,7 @@ if SHIELD_HILLSIDE_VIEW_LEFT
 config ZMK_KEYBOARD_NAME
     default "Hillside View"
 
-# Left half is peripheral 0 when using dongle
-config ZMK_SPLIT_BLE_PERIPHERAL_POSITION
-    default 0
-
 endif # SHIELD_HILLSIDE_VIEW_LEFT
-
-if SHIELD_HILLSIDE_VIEW_RIGHT
-
-# Right half is peripheral 1 when using dongle  
-config ZMK_SPLIT_BLE_PERIPHERAL_POSITION
-    default 1
-
-endif # SHIELD_HILLSIDE_VIEW_RIGHT
 
 if SHIELD_HILLSIDE_VIEW_LEFT || SHIELD_HILLSIDE_VIEW_RIGHT
 
