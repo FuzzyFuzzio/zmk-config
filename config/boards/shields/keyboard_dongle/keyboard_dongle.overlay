@@ -1,6 +1,8 @@
 /* Central dongle overlay for nrf52840_mdk_usb_dongle */
 
 #include "keyboard_dongle.dtsi"
+#include <input/processors.dtsi>
+#include <dt-bindings/zmk/input_transform.h>
 
 / {
     /* Native ZMK split input support - central side receives input from peripherals */
@@ -19,5 +21,13 @@
             compatible = "zmk,input-split";
             reg = <0>;
         };
+    };
+
+    /* Input listener for received pointer events */
+    glidepoint_input_listener: glidepoint_input {
+        compatible = "zmk,input-listener";
+        device = <&glidepoint0>;
+        /* Optional: additional processing on central side */
+        input-processors = <&zip_xy_scaler 2 1>;
     };
 };

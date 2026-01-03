@@ -5,6 +5,8 @@
  */
 
 #include "hillside_view.dtsi"
+#include <input/processors.dtsi>
+#include <dt-bindings/zmk/input_transform.h>
 
 &default_transform {
   col-offset = <6>;
@@ -59,6 +61,8 @@
             compatible = "zmk,input-split";
             reg = <1>; /* Must match central's glidepoint_right reg value */
             device = <&glidepoint0>; /* Physical Cirque glidepoint */
+            /* Input processors run before sending to central - for orientation/scaling */
+            input-processors = <&zip_xy_transform (INPUT_TRANSFORM_Y_INVERT)>;
         };
     };
 };
