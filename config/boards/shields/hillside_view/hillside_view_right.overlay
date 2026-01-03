@@ -62,11 +62,15 @@
         };
     };
 
-    /* Input listener to process trackpad events into pointer movements */
-    tpad_listener {
-        compatible = "zmk,input-behavior-listener";
-        device = <&glidepoint0>;
-        y-invert;
-        scale-multiplier = <2>;
+    /* Input listeners to process trackpad events into pointer movements */
+    input_listeners {
+        compatible = "zmk,input-listeners";
+
+        tpad_listener {
+            compatible = "zmk,input-behavior-listener";
+            device = <&glidepoint0>;
+            y-invert;
+            scale-multiplier = <2>;
+        };
     };
 };
