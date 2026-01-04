@@ -6,6 +6,8 @@ manifest:
       url-base: https://github.com/badjeff
     - name: infely
       url-base: https://github.com/infely
+    - name: FuzzyFuzzio
+      url-base: https://github.com/FuzzyFuzzio
   projects:
     # - name: zmk
     #  remote: zmkfirmware
@@ -59,7 +61,7 @@ manifest:
       remote: badjeff
       revision: main
     - name: nice-view-battery
-      remote: infely
+      remote: FuzzyFuzzio
       revision: main 
   self:
     path: config
