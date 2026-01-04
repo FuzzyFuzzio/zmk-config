@@ -9,13 +9,9 @@ manifest:
     - name: FuzzyFuzzio
       url-base: https://github.com/FuzzyFuzzio
   projects:
-    # - name: zmk
-    #  remote: zmkfirmware
-    #  revision: main
-    #  import: app/west.yml
     - name: zmk
-      remote: badjeff
-      revision: feat/pointers-with-input-processors
+      remote: zmkfirmware
+      revision: main
       import: app/west.yml
     - name: zmk-adns9800-driver
       remote: badjeff
@@ -56,10 +52,11 @@ manifest:
       revision: main
     - name: zmk-kscan-blackout
       remote: badjeff
-      revision: main      
-    - name: cirque-input-module
-      remote: badjeff
       revision: main
+    # cirque-input-module no longer needed - Cirque support is built into main ZMK fork
+    # - name: cirque-input-module
+    #   remote: badjeff
+    #   revision: main
     - name: nice-view-battery
       remote: FuzzyFuzzio
       revision: main
