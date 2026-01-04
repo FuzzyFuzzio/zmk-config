@@ -39,15 +39,10 @@
 /* Left half now pure peripheral when using external dongle */
 
 / {
-  /* Virtual input device for keymap compatibility only - not actually used for split input */
-  glidepoint1: virtual_input {
-    compatible = "zmk,virtual-input";
-  };
-
-  behaviors {
-    ly_sync: ly_sync {
-      compatible = "zmk,behavior-layer-sync";
-      #binding-cells = <0>;
+    behaviors {
+        ly_sync: ly_sync {
+            compatible = "zmk,behavior-layer-sync";
+            #binding-cells = <0>;
     };
   };
 };

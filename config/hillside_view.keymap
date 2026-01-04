@@ -33,29 +33,6 @@
 };
 
 / {
-    /* assign `input-listener` to all pointing devices */
-    /* &glidepoint0 on central, &glidepoint1 on peripheral */
-
-    tpad_central_listener {
-        compatible = "zmk,input-listener";
-        device = <&glidepoint0>;
-        input-processors = <&zip_xy_scaler 2 1>, <&zip_xy_transform INPUT_TRANSFORM_Y_INVERT>;
-    };
-
-    tpad_peripheral_listener {
-        compatible = "zmk,input-listener";
-        device = <&glidepoint1>;
-        input-processors = <&zip_xy_scaler 2 1>, <&zip_xy_transform INPUT_TRANSFORM_Y_INVERT>;
-        
-        // Layer-specific override for scrolling on SYM layer
-        scroller {
-            layers = <SYM>;
-            input-processors = <&zip_xy_to_scroll_mapper>, <&zip_scroll_scaler 1 8>;
-        };
-    };
-};
-
-/ {
     conditional_layers {
         compatible = "zmk,conditional-layers";
 

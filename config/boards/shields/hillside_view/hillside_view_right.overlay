@@ -47,15 +47,23 @@
 };
 
 / {
-    /* Virtual input device for keymap binding compatibility (left side equivalent) */
-	glidepoint1: virtual_input {
-		compatible = "zmk,virtual-input";
-	};
-
     behaviors {
         ly_sync: ly_sync {
             compatible = "zmk,behavior-layer-sync";
             #binding-cells = <0>;
+        };
+    };
+
+    /* Input listener for the physical trackpad on this peripheral */
+    tpad_listener {
+        compatible = "zmk,input-listener";
+        device = <&glidepoint0>;
+        input-processors = <&zip_xy_scaler 2 1>, <&zip_xy_transform INPUT_TRANSFORM_Y_INVERT>;
+        
+        // Layer-specific override for scrolling on SYM layer
+        scroller {
+            layers = <2>; // SYM layer
+            input-processors = <&zip_xy_to_scroll_mapper>, <&zip_scroll_scaler 1 8>;
         };
     };
 
