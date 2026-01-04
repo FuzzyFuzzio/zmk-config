@@ -1,8 +1,7 @@
 // Dongle keymap - standalone version without input listeners
 // The dongle receives input via split protocol, not from physical devices
 
-#include <dt-bindings/zmk/mouse.h>
-#include <behaviors/mouse_keys.dtsi>
+#include <dt-bindings/zmk/pointing.h>
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/keys.h>
