@@ -54,19 +54,6 @@
         };
     };
 
-    /* Input listener for the physical trackpad on this peripheral */
-    tpad_listener {
-        compatible = "zmk,input-listener";
-        device = <&glidepoint0>;
-        input-processors = <&zip_xy_scaler 2 1>, <&zip_xy_transform INPUT_TRANSFORM_Y_INVERT>;
-        
-        // Layer-specific override for scrolling on SYM layer
-        scroller {
-            layers = <2>; // SYM layer
-            input-processors = <&zip_xy_to_scroll_mapper>, <&zip_scroll_scaler 1 8>;
-        };
-    };
-
     /* Native ZMK split input support - peripheral sends physical glidepoint to central */
     split_inputs {
         #address-cells = <1>;
@@ -76,8 +63,6 @@
             compatible = "zmk,input-split";
             reg = <1>; /* Must match central's glidepoint_right reg value */
             device = <&glidepoint0>; /* Physical Cirque glidepoint */
-            /* Input processors run before sending to central - for orientation/scaling */
-            input-processors = <&zip_xy_transform (INPUT_TRANSFORM_Y_INVERT)>;
         };
     };
 };
