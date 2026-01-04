@@ -13,11 +13,11 @@
 #
 ---
 include:
-  - board: nice_nano_v2
+  - board: nice_nano@2
     shield: hillside_view_left nice_view_battery
-  - board: nice_nano_v2
+  - board: nice_nano@2
     shield: hillside_view_right nice_view_battery
-  - board: nice_nano_v2
+  - board: nice_nano@2
     shield: settings_reset
   - board: nrf52840_mdk_usb_dongle
     shield: keyboard_dongle
