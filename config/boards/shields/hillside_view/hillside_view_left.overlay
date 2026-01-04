@@ -45,7 +45,7 @@
   };
 
   behaviors {
-    layer_sync: layer_sync {
+    ly_sync: ly_sync {
       compatible = "zmk,behavior-layer-sync";
       #binding-cells = <0>;
     };
