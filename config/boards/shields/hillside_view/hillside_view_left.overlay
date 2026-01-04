@@ -43,5 +43,12 @@
   glidepoint1: virtual_input {
     compatible = "zmk,virtual-input";
   };
+
+  behaviors {
+    layer_sync: layer_sync {
+      compatible = "zmk,behavior-layer-sync";
+      #binding-cells = <0>;
+    };
+  };
 };
 

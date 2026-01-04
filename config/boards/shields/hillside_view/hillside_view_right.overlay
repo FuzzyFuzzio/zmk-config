@@ -52,6 +52,13 @@
 		compatible = "zmk,virtual-input";
 	};
 
+    behaviors {
+        layer_sync: layer_sync {
+            compatible = "zmk,behavior-layer-sync";
+            #binding-cells = <0>;
+        };
+    };
+
     /* Native ZMK split input support - peripheral sends physical glidepoint to central */
     split_inputs {
         #address-cells = <1>;

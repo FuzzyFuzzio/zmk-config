@@ -62,6 +62,9 @@ manifest:
       revision: main
     - name: nice-view-battery
       remote: FuzzyFuzzio
-      revision: main 
+      revision: main
+    - name: zmk-split-layer-sync
+      remote: FuzzyFuzzio
+      revision: main
   self:
     path: config
