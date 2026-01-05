@@ -60,4 +60,29 @@
             /* Input processors can be applied here after receiving from peripheral */
         };
     };
+
+    /* Input behavior listeners - left_central has both devices */
+    tpad_peripheral_listener {
+        compatible = "zmk,input-behavior-listener";
+        device = <&glidepoint1>;
+        y-invert;
+        scale-multiplier = <2>;
+    };
+
+    tpad_peripheral_scroll {
+        compatible = "zmk,input-behavior-listener";
+        device = <&glidepoint1>;
+        layers = <2>; /* SYM layer */
+        evt-type = <INPUT_EV_REL>;
+        x-input-code = <INPUT_REL_MISC>;
+        y-input-code = <INPUT_REL_WHEEL>;
+        bindings = <&ib_wheel_scaler 1 8>;
+    };
+
+    ib_wheel_scaler: ib_wheel_scaler {
+        compatible = "zmk,input-behavior-scaler";
+        #binding-cells = <2>;
+        evt-type = <INPUT_EV_REL>;
+        input-code = <INPUT_REL_WHEEL>;
+    };
 };
