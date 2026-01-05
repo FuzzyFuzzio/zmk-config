@@ -1,0 +1,63 @@
+/*
+ * Copyright (c) 2022 The ZMK Contributors
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "hillside_view.dtsi"
+#include <input/processors.dtsi>
+#include <dt-bindings/zmk/input_transform.h>
+
+&kscan0  {
+    col-gpios
+        = <&gpio1 7 GPIO_ACTIVE_HIGH>
+        , <&pro_micro 18 GPIO_ACTIVE_HIGH>
+        , <&pro_micro 15 GPIO_ACTIVE_HIGH>
+        , <&pro_micro 14 GPIO_ACTIVE_HIGH>
+        , <&pro_micro 16 GPIO_ACTIVE_HIGH>
+        , <&pro_micro 10 GPIO_ACTIVE_HIGH>
+        ;
+};
+
+&left_encoder {
+    status = "okay";
+    a-gpios = <&pro_micro 20 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+    b-gpios = <&pro_micro 21 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+};
+
+&chosen {
+    zephyr,display = &nice_view;
+};
+
+// nice view bus
+&nice_view_spi {
+    status = "okay";
+};
+
+&nice_view {
+    status = "okay";
+};
+
+/* Left half as central - no dongle mode */
+
+/ {
+    /* Placeholder for right peripheral's glidepoint (will be received via split) */
+    glidepoint1: virtual_input {
+        compatible = "zmk,virtual-input";
+    };
+
+    /* Native ZMK split input support - central receives from peripheral */
+    split_central_inputs {
+        compatible = "zmk,split-central-input-controller";
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        /* Receive right side trackpad */
+        glidepoint_right: glidepoint_central@1 {
+            compatible = "zmk,input-split-listener";
+            reg = <1>; /* Must match peripheral's glidepoint_split_right reg value */
+            device = <&glidepoint1>; /* Virtual device for right trackpad */
+            /* Input processors can be applied here after receiving from peripheral */
+        };
+    };
+};

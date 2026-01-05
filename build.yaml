@@ -12,12 +12,45 @@
 #     shield: reviung41
 #
 ---
+
+# ═══════════════════════════════════════════════════════════════════
+# Builds firmware for BOTH dongle and no-dongle modes
+# Flash the appropriate firmware based on your setup
+# ═══════════════════════════════════════════════════════════════════
+
 include:
-  - board: nice_nano_v2
-    shield: hillside_view_left nice_view_battery
-  - board: nice_nano_v2
-    shield: hillside_view_right nice_view_battery
-  - board: nice_nano_v2
-    shield: settings_reset
+  # ╔═══════════════════════════════════════════════════════════════╗
+  # ║ DONGLE MODE - Use these firmware files with USB dongle       ║
+  # ╚═══════════════════════════════════════════════════════════════╝
+  
+  # Central (dongle - no display, no trackpad, just relays HID)
   - board: nrf52840_mdk_usb_dongle
     shield: keyboard_dongle
+  
+  # Left peripheral (has display, for use with dongle)
+  - board: nice_nano_v2
+    shield: hillside_view_left nice_view_battery
+  
+  # ╔═══════════════════════════════════════════════════════════════╗
+  # ║ NO-DONGLE MODE - Use this firmware without dongle            ║
+  # ╚═══════════════════════════════════════════════════════════════╝
+  
+  # Left central (has display, receives trackpad from right, no dongle needed)
+  - board: nice_nano_v2
+    shield: hillside_view_left_central nice_view_battery
+  
+  # ╔═══════════════════════════════════════════════════════════════╗
+  # ║ SHARED - Right keyboard (same for both modes)                ║
+  # ╚═══════════════════════════════════════════════════════════════╝
+  
+  # Right peripheral (has trackpad, no display)
+  - board: nice_nano_v2
+    shield: hillside_view_right
+  
+  # ╔═══════════════════════════════════════════════════════════════╗
+  # ║ UTILITY                                                       ║
+  # ╚═══════════════════════════════════════════════════════════════╝
+  
+  # Settings reset
+  - board: nice_nano_v2
+    shield: settings_reset
