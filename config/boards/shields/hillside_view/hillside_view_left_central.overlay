@@ -41,48 +41,34 @@
 /* Left half as central - no dongle mode */
 
 / {
-    /* Placeholder for right peripheral's glidepoint (will be received via split) */
+    /* Native ZMK split input support - receive right trackpad input from peripheral */
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        /* Split device for right peripheral glidepoint (reg 1) - keymap expects glidepoint0 */
+        glidepoint0: glidepoint0@1 {
+            compatible = "zmk,input-split";
+            reg = <1>;
+        };
+    };
+
+    /* Virtual input device for keymap compatibility - left side has no physical input */
     glidepoint1: virtual_input {
         compatible = "zmk,virtual-input";
     };
 
-    /* Native ZMK split input support - central receives from peripheral */
-    split_central_inputs {
-        compatible = "zmk,split-central-input-controller";
-        #address-cells = <1>;
-        #size-cells = <0>;
-
-        /* Receive right side trackpad */
-        glidepoint_right: glidepoint_central@1 {
-            compatible = "zmk,input-split-listener";
-            reg = <1>; /* Must match peripheral's glidepoint_split_right reg value */
-            device = <&glidepoint1>; /* Virtual device for right trackpad */
-            /* Input processors can be applied here after receiving from peripheral */
+    /* Input listener for received pointer events from right trackpad */
+    glidepoint_input_listener: glidepoint_input {
+        compatible = "zmk,input-listener";
+        device = <&glidepoint0>;
+        /* Default: 2x scaling for normal pointer movement */
+        input-processors = <&zip_xy_scaler 2 1>;
+        
+        /* Layer-specific override: convert to scroll on SYM layer (layer 2) with inverted Y */
+        scroll_layer {
+            layers = <2>;
+            input-processors = <&zip_xy_transform (INPUT_TRANSFORM_Y_INVERT)>, <&zip_xy_to_scroll_mapper>;
         };
-    };
-
-    /* Input behavior listeners - left_central has both devices */
-    tpad_peripheral_listener {
-        compatible = "zmk,input-behavior-listener";
-        device = <&glidepoint1>;
-        y-invert;
-        scale-multiplier = <2>;
-    };
-
-    tpad_peripheral_scroll {
-        compatible = "zmk,input-behavior-listener";
-        device = <&glidepoint1>;
-        layers = <2>; /* SYM layer */
-        evt-type = <INPUT_EV_REL>;
-        x-input-code = <INPUT_REL_MISC>;
-        y-input-code = <INPUT_REL_WHEEL>;
-        bindings = <&ib_wheel_scaler 1 8>;
-    };
-
-    ib_wheel_scaler: ib_wheel_scaler {
-        compatible = "zmk,input-behavior-scaler";
-        #binding-cells = <2>;
-        evt-type = <INPUT_EV_REL>;
-        input-code = <INPUT_REL_WHEEL>;
     };
 };
