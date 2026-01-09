@@ -70,9 +70,9 @@
         /* Default: 2x scaling for normal pointer movement */
         input-processors = <&zip_xy_scaler 2 1>;
         
-        /* Layer-specific override: convert to scroll on SYM layer (layer 2) with inverted Y */
+        /* Layer-specific override: convert to scroll on SYM layer (layer 3) with inverted Y */
         scroll_layer {
-            layers = <2>;
+            layers = <3>;
             input-processors = <&zip_xy_transform (INPUT_TRANSFORM_Y_INVERT)>, <&zip_xy_to_scroll_mapper>;
         };
     };
