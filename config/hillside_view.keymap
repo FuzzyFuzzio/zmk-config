@@ -3,6 +3,7 @@
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/pointing.h>
 
 // Left bottom row pinky 2nd column
 
@@ -48,7 +49,7 @@
         ht: hold_tap {
             compatible = "zmk,behavior-hold-tap";
             #binding-cells = <2>;
-            tapping-term-ms = <350>;
+            tapping-term-ms = <275>;
             quick-tap-ms = <175>;
             flavor = "tap-preferred";
             bindings = <&kp>, <&kp>;
@@ -62,7 +63,7 @@
             bindings = <&kp>, <&kp>;
 
             #binding-cells = <2>;
-            tapping-term-ms = <190>;
+            tapping-term-ms = <185>;
             quick-tap-ms = <175>;
             flavor = "balanced";
             hold-trigger-on-release;
@@ -75,7 +76,7 @@
             bindings = <&kp>, <&kp>;
 
             #binding-cells = <2>;
-            tapping-term-ms = <190>;
+            tapping-term-ms = <185>;
             quick-tap-ms = <175>;
             flavor = "balanced";
             hold-trigger-key-positions = <1 2 3 4 5 13 14 15 16 17 25 26 27 28 29 40 41>;
