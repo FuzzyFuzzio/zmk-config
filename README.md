@@ -53,7 +53,3 @@ If pointer input from the right half is missing:
 - Host sees two devices: Remove old bond to a former central (e.g., left half) from OS BT settings.
 - No USB output: Verify dongle shield config has `CONFIG_ZMK_USB=y` and board supports USB (it does).
 
-### Future Enhancements
-- Add a pairing/status key or LED to the dongle (would then create a `keyboard_dongle.dtsi`).
-- Add a battery reporting behavior if powering the dongle from a battery (currently USB powered).
-
