@@ -2,11 +2,11 @@
 
 Layout tool: https://nickcoutsos.github.io/keymap-editor/
 
-![layer0](./visualization/layer0.png)
-![layer1](./visualization/layer1.png)
-![layer2](./visualization/layer2.png)
-![layer3](./visualization/layer3.png)
-![layer4](./visualization/layer4.png)
+![layer0](<./visualization/default layer.png>)
+![layer1](<./visualization/game layer.png>)
+![layer2](<./visualization/left layer.png>)
+![layer3](<./visualization/right layer.png>)
+![layer4](<./visualization/func layer.png>)
 
 ## Dongle-Based Split Setup
 
