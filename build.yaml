@@ -51,6 +51,10 @@ include:
   # ║ UTILITY                                                       ║
   # ╚═══════════════════════════════════════════════════════════════╝
   
-  # Settings reset
+  # Settings reset (nice_nano_v2)
   - board: nice_nano_v2
+    shield: settings_reset
+
+  # Settings reset (dongle)
+  - board: nrf52840_mdk_usb_dongle
     shield: settings_reset
