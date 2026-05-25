@@ -7,6 +7,12 @@
 if(CONFIG_DONGLE_BOND_AUTOHEAL OR CONFIG_PERIPHERAL_BOOT_BONDCLEAR)
     zephyr_library()
 
+    # ZMK app headers (zmk/event_manager.h, zmk/events/*.h) live in the
+    # ZMK app's include/ directory, which isn't propagated to module
+    # libraries by default. In ZMK builds CMAKE_SOURCE_DIR is `zmk/app`,
+    # so ${CMAKE_SOURCE_DIR}/include resolves to ZMK's public app headers.
+    zephyr_library_include_directories(${CMAKE_SOURCE_DIR}/include)
+
     zephyr_library_sources_ifdef(CONFIG_DONGLE_BOND_AUTOHEAL
         src/dongle_bond_autoheal.c)
 
