@@ -1,4 +1,6 @@
 build:
+  cmake: dongle_split_recovery
+  kconfig: dongle_split_recovery/Kconfig
   settings:
     board_root: .
     dts_root: .

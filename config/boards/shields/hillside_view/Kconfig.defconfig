@@ -16,6 +16,14 @@ config ZMK_SPLIT
 # Both halves are peripherals when using external dongle
 # Do NOT set ZMK_SPLIT_ROLE_CENTRAL - absence means peripheral role
 
+# Enable the peripheral-side boot-time bond clear escape hatch. Holding
+# the configured trigger combo while powering the half on wipes its
+# stored bond so it pairs fresh with the dongle on next connect.
+# This only runs on peripherals (the depends-on in the Kconfig blocks
+# it on hillside_view_left_central). See config/dongle_split_recovery/.
+config PERIPHERAL_BOOT_BONDCLEAR
+    default y
+
 config ZMK_RGB_UNDERGLOW
     select WS2812_STRIP
     select SPI

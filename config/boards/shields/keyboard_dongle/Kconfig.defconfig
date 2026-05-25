@@ -18,4 +18,10 @@ config ZMK_USB
 config ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
     default 2
 
+# Enable the dongle-side automatic bond recovery. Catches BLE security
+# failures with a split peripheral and clears the stale bond so the next
+# connection re-pairs cleanly. See config/dongle_split_recovery/.
+config DONGLE_BOND_AUTOHEAL
+    default y
+
 endif # SHIELD_KEYBOARD_DONGLE
