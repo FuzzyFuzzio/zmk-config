@@ -2,4 +2,11 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    # Pinned to the upstream commit just before ZMK's CI added a
+    # post-build `west boards --format "{qualifiers}"` check that
+    # requires Zephyr 4.1's west. This repo uses the badjeff
+    # `feat/pointers-with-input-processors` fork which is still on
+    # Zephyr 3.5, so newer upstream CI fails with
+    # `KeyError: 'qualifiers'` even when the firmware builds cleanly.
+    # Bump this ref once we migrate west.yml to a Zephyr-4.1 ZMK.
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@8266433d6b85cfecf57a4ba48e27e1eebb3de7b2
