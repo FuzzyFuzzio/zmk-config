@@ -16,13 +16,37 @@ config ZMK_SPLIT
 # Both halves are peripherals when using external dongle
 # Do NOT set ZMK_SPLIT_ROLE_CENTRAL - absence means peripheral role
 
-# Enable the peripheral-side boot-time bond clear escape hatch. Holding
-# the configured trigger combo while powering the half on wipes its
-# stored bond so it pairs fresh with the dongle on next connect.
-# This only runs on peripherals (the depends-on in the Kconfig blocks
-# it on hillside_view_left_central). See config/dongle_split_recovery/.
+# Enable the peripheral-side bond clear escape hatch. There are two
+# trigger modes (see config/dongle_split_recovery/):
+#   * Boot window: hold the trigger combo while powering the half on.
+#   * Panic hold: hold the trigger combo for several seconds at any
+#     time during normal operation.
+# Either fires the same bt_unpair. Only runs on peripherals; the
+# Kconfig depends-on excludes hillside_view_left_central.
 config PERIPHERAL_BOOT_BONDCLEAR
     default y
+
+# Trigger combo = the two outer corner keys (top + bottom of the
+# outermost column on each half). The matrix transform numbers the
+# global keymap left-to-right, top-to-bottom, six keys per row per
+# half. The right half's overlay sets col-offset = <6>, so a
+# peripheral only emits position events in its own slice of the
+# global map - hence per-half defaults below.
+if SHIELD_HILLSIDE_VIEW_LEFT
+# Left top-outer-left (RC(0,0)) and bottom-outer-left (RC(2,0)).
+config PERIPHERAL_BOOT_BONDCLEAR_POS_A
+    default 0
+config PERIPHERAL_BOOT_BONDCLEAR_POS_B
+    default 24
+endif
+
+if SHIELD_HILLSIDE_VIEW_RIGHT
+# Right top-outer-right (RC(0,11)) and bottom-outer-right (RC(2,11)).
+config PERIPHERAL_BOOT_BONDCLEAR_POS_A
+    default 11
+config PERIPHERAL_BOOT_BONDCLEAR_POS_B
+    default 35
+endif
 
 config ZMK_RGB_UNDERGLOW
     select WS2812_STRIP

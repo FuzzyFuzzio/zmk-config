@@ -56,56 +56,79 @@ config PERIPHERAL_BOOT_BONDCLEAR
     bool "Peripheral: clear bonds at boot when a key combo is held"
     depends on BT && ZMK_SPLIT && !ZMK_SPLIT_ROLE_CENTRAL
     help
-      On a split peripheral, watch for a specific key combo during a
-      short window after boot. If the combo is held, unpair all
-      bonds (including the bond with the central). On the next
-      reconnect the peripheral has no stored bond, so SMP does a
-      fresh just-works pairing - which clears any stale CCC / GATT
-      state on the central side too.
+      On a split peripheral, watch for a specific two-key combo and
+      unpair all bonds (including the bond with the central) when
+      it is held. On the next reconnect the peripheral has no stored
+      bond, so SMP does a fresh just-works pairing - which clears
+      any stale CCC / GATT state on the central side too.
 
-      This is the manual escape hatch for the "BLE link up but no
-      input" failure mode that the dongle-side auto-heal cannot
-      detect (because security_changed fires with SUCCESS and the
-      desync is at the GATT layer above).
+      Two trigger modes are provided:
 
-      Recovery procedure for the user:
-        1. Flip the half's power switch OFF.
-        2. Hold the two designated trigger keys.
-        3. Flip the power switch back ON, keep holding for ~2 s.
-        4. Release. The half re-pairs on its next connection.
+        * Boot window - the combo is sampled during a short window
+          right after cold boot. Procedure for the user:
+            1. Flip the half's power switch OFF.
+            2. Hold the two designated trigger keys.
+            3. Flip the power switch back ON, keep holding ~2 s.
+            4. Release. The half re-pairs on its next connection.
 
-      The trigger fires only inside the early boot window, so it
-      never interferes with normal typing or with peripheral
-      sleep/wake cycles (sleep is not a power cycle - the boot
-      window only opens on cold boot).
+        * Panic hold - the combo is also sampled at any time during
+          normal operation. If both trigger keys are held
+          simultaneously for PERIPHERAL_BOOT_BONDCLEAR_HOLD_MS
+          milliseconds without either being released, the unpair
+          fires. This is the in-session recovery path for the
+          "link up but no input flows" failure mode that the
+          dongle-side auto-heal cannot detect on its own (because
+          security_changed fires with SUCCESS and the desync is at
+          the GATT subscription layer above).
+
+      The two trigger keys are designed to be the half's outer
+      corners (top + bottom of the outermost column) for both
+      easy recall and low false-trigger risk during normal typing.
 
 if PERIPHERAL_BOOT_BONDCLEAR
 
 config PERIPHERAL_BOOT_BONDCLEAR_WINDOW_MS
     int "Boot window during which the trigger combo is sampled (ms)"
-    default 2500
+    default 4000
     help
-      How long after boot the trigger combo is watched for. After
-      this window the listener disarms and key events are processed
-      normally.
+      How long after boot the trigger combo is watched for in
+      "boot window" mode. After this elapses the boot-mode
+      listener disarms; the always-on panic-hold mode below
+      remains active. Generous default leaves room for slow
+      kscan / BT host init.
+
+config PERIPHERAL_BOOT_BONDCLEAR_HOLD_MS
+    int "Panic-mode simultaneous-hold duration (ms, 0 to disable)"
+    default 5000
+    help
+      Outside the boot window, both trigger keys must be held
+      simultaneously and continuously for this many milliseconds
+      before the unpair fires. Set to 0 to disable panic mode
+      entirely (boot-window-only behavior).
+
+      The default 5 seconds is well beyond any normal typing or
+      hold-tap pattern, and the two outer-corner trigger keys are
+      too far apart to be pressed accidentally by a resting hand,
+      so false positives are extremely unlikely.
 
 config PERIPHERAL_BOOT_BONDCLEAR_POS_A
     int "First trigger position (half-local matrix position)"
     default 0
     help
-      Half-local matrix position number for the first key of the
-      trigger combo. Position 0 is the top-outermost key of the
-      half (top-left of the left half, top-right of the right half,
-      because the matrix is mirrored).
+      Matrix position number for the first key of the trigger
+      combo, as seen by THIS half's local kscan after the matrix
+      transform. Set per-shield in each half's Kconfig.defconfig
+      so the combo lands on physical "outer corner" keys on both
+      halves despite the right half's col-offset = <6>.
 
 config PERIPHERAL_BOOT_BONDCLEAR_POS_B
     int "Second trigger position (half-local matrix position)"
-    default 5
+    default 24
     help
-      Half-local matrix position number for the second key of the
-      trigger combo. Position 5 is the top-innermost key of the
-      half. Both keys must be pressed simultaneously inside the
-      boot window for the unpair to fire.
+      Matrix position number for the second key of the trigger
+      combo. See POS_A. The default pair (0, 24) maps to the
+      LEFT half's top-outermost + bottom-outermost keys. The
+      RIGHT half overrides to (11, 35).
 
 module = PERIPHERAL_BOOT_BONDCLEAR
 module-str = peripheral_boot_bondclear
