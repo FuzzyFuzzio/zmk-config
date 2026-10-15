@@ -176,7 +176,9 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
         return;
     }
 
-    if (p->encrypted || MAX_UNENC_DISCONNECTS == 0) {
+    /* 0x3E = link never established (RF), says nothing about the keys. */
+    if (p->encrypted || MAX_UNENC_DISCONNECTS == 0 ||
+        reason == BT_HCI_ERR_CONN_FAIL_TO_ESTAB) {
         return;
     }
 
