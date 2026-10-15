@@ -45,6 +45,18 @@ config DONGLE_BOND_AUTOHEAL_COOLDOWN_MS
       the same peer address. Prevents pathological loops if pairing
       keeps failing for an unrelated reason.
 
+config DONGLE_BOND_AUTOHEAL_MAX_UNENCRYPTED_DISCONNECTS
+    int "Consecutive pre-encryption disconnects before clearing a bond (0 = off)"
+    default 3
+    range 0 255
+    help
+      If a split peripheral connects and then disconnects this many
+      times in a row without the link ever reaching encryption, assume
+      the two sides hold mismatched keys and clear the dongle's bond.
+      With mismatched keys the peripheral detects the MIC failure and
+      drops the link, so the dongle sees no security error - only
+      repeated disconnects. Any successful encryption resets the count.
+
 module = DONGLE_BOND_AUTOHEAL
 module-str = dongle_bond_autoheal
 source "subsys/logging/Kconfig.template.log_config"
