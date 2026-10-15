@@ -2,21 +2,17 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
-    - name: petejohanson
-      url-base: https://github.com/petejohanson
-    - name: infely
-      url-base: https://github.com/infely
+    - name: geratrevino115
+      url-base: https://github.com/geratrevino115
   projects:
-    # Latest stable ZMK release (Zephyr 3.5). main is on Zephyr 4.x and unreleased.
+    # Unreleased development branch (Zephyr 4.1). Pin to v0.4 once it is released.
     - name: zmk
       remote: zmkfirmware
-      revision: v0.3
+      revision: main
       import: app/west.yml
-    - name: cirque-input-module
-      remote: petejohanson
-      revision: main
+    # LVGL 9 port of infely/nice-view-battery (upstream is LVGL 8 only)
     - name: nice-view-battery
-      remote: infely
-      revision: main
+      remote: geratrevino115
+      revision: d1f68d33cd15c1df5ac6c487872a3a2ace8f8f33
   self:
     path: config

@@ -48,24 +48,17 @@ config PERIPHERAL_BOOT_BONDCLEAR_POS_B
     default 35
 endif
 
-config ZMK_RGB_UNDERGLOW
-    select WS2812_STRIP
-    select SPI
-
 config ZMK_DISPLAY
     select LV_FONT_MONTSERRAT_26
-
-if ZMK_POINTING
-
-config I2C
-  default y
-
-endif # ZMK_POINTING
 
 if ZMK_DISPLAY
 
 config ZMK_DISPLAY_BLANK_ON_IDLE
   default n
+
+# LVGL 9 needs a bigger heap than LVGL 8 (matches ZMK's nice_view shield)
+config LV_Z_MEM_POOL_SIZE
+    default 5120 if ZMK_DISPLAY_STATUS_SCREEN_BUILT_IN
 
 config SPI
     default y

@@ -15,17 +15,17 @@ This configuration uses an `nrf52840_mdk_usb_dongle` as the central, with both h
 ### Architecture
 - **Central**: USB dongle (connects to host via USB only, no BLE to host)
 - **Peripherals**: Left and right halves (connect to central via BLE split protocol)
-- **Pointer relay**: Uses native `CONFIG_ZMK_INPUT_SPLIT` (ZMK PR #2477) instead of external relay modules
-  - Right physical glidepoint: `reg = <1>` 
-  - Left virtual input: `reg = <0>` (for keymap binding symmetry)
+- **Pointer relay**: Uses native `CONFIG_ZMK_INPUT_SPLIT`
+  - Right physical glidepoint (Zephyr's upstream `cirque,pinnacle` driver): `reg = <1>`
 
 ### Build Targets
 | Device | Board | Shield |
 | ------ | ------ | ------ |
-| Left half | `nice_nano_v2` | `hillside_view_left nice_view_battery` |
-| Right half | `nice_nano_v2` | `hillside_view_right nice_view_battery` |
+| Left half | `nice_nano//zmk` | `hillside_view_left nice_view_battery` |
+| Right half | `nice_nano//zmk` | `hillside_view_right` |
+| Left as central (no dongle) | `nice_nano//zmk` | `hillside_view_left_central nice_view_battery` |
 | Dongle | `nrf52840_mdk_usb_dongle` | `keyboard_dongle` |
-| Settings reset (optional) | `nice_nano_v2` | `settings_reset` |
+| Settings reset (optional) | `nice_nano//zmk` | `settings_reset` |
 
 ### Flash Order
 1. (Optional) Flash `settings_reset` onto each half to clear prior bonds. Then re-flash their normal firmware.
@@ -40,8 +40,7 @@ This configuration uses an `nrf52840_mdk_usb_dongle` as the central, with both h
 5. After pairing, key presses and pointing events from both halves should appear on the host.
 
 ### Verifying Pointer Relay
-Right side: physical glidepoint (`glidepoint0`) -> split input `reg=<1>` -> resurrected as `glidepoint_right` on dongle.
-Left side: virtual input only (no hardware) -> split input `reg=<0>` -> resurrected as `glidepoint_left` on dongle for keymap binding symmetry.
+Right side: physical glidepoint (`glidepoint0`) -> split input `reg=<1>` -> `glidepoint0` input split + listener on the central.
 
 If pointer input from the right half is missing:
 - Confirm both halves show connected status (LED behavior or via logs if enabled).

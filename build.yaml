@@ -28,7 +28,7 @@ include:
     shield: keyboard_dongle
   
   # Left peripheral (has display, for use with dongle)
-  - board: nice_nano_v2
+  - board: nice_nano//zmk
     shield: hillside_view_left nice_view_battery
   
   # ╔═══════════════════════════════════════════════════════════════╗
@@ -36,7 +36,7 @@ include:
   # ╚═══════════════════════════════════════════════════════════════╝
   
   # Left central (has display, receives trackpad from right, no dongle needed)
-  - board: nice_nano_v2
+  - board: nice_nano//zmk
     shield: hillside_view_left_central nice_view_battery
   
   # ╔═══════════════════════════════════════════════════════════════╗
@@ -44,15 +44,15 @@ include:
   # ╚═══════════════════════════════════════════════════════════════╝
   
   # Right peripheral (has trackpad, no display)
-  - board: nice_nano_v2
+  - board: nice_nano//zmk
     shield: hillside_view_right
   
   # ╔═══════════════════════════════════════════════════════════════╗
   # ║ UTILITY                                                       ║
   # ╚═══════════════════════════════════════════════════════════════╝
   
-  # Settings reset (nice_nano_v2)
-  - board: nice_nano_v2
+  # Settings reset (nice_nano)
+  - board: nice_nano//zmk
     shield: settings_reset
 
   # Settings reset (dongle)
