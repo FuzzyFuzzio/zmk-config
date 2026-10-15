@@ -1,6 +1,7 @@
 /* DTSI for keyboard_dongle - must match hillside_view matrix */
 
 #include <dt-bindings/zmk/matrix_transform.h>
+#include <behaviors/layer_sync.dtsi>
 
 / {
     chosen {

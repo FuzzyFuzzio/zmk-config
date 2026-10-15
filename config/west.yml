@@ -4,8 +4,6 @@ manifest:
       url-base: https://github.com/zmkfirmware
     - name: petejohanson
       url-base: https://github.com/petejohanson
-    - name: infely
-      url-base: https://github.com/infely
   projects:
     # Latest stable ZMK release (Zephyr 3.5). main is on Zephyr 4.x and unreleased.
     - name: zmk
@@ -14,9 +12,6 @@ manifest:
       import: app/west.yml
     - name: cirque-input-module
       remote: petejohanson
-      revision: main
-    - name: nice-view-battery
-      remote: infely
       revision: main
   self:
     path: config
