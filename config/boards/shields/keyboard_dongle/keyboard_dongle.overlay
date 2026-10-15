@@ -17,11 +17,6 @@
         };
     };
 
-    /* Virtual input device for keymap compatibility - left side has no physical input */
-    glidepoint1: virtual_input {
-        compatible = "zmk,virtual-input";
-    };
-
     /* Input listener for received pointer events */
     glidepoint_input_listener: glidepoint_input {
         compatible = "zmk,input-listener";

@@ -2,27 +2,18 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
-    - name: badjeff
-      url-base: https://github.com/badjeff
+    - name: petejohanson
+      url-base: https://github.com/petejohanson
     - name: infely
       url-base: https://github.com/infely
   projects:
-    # - name: zmk
-    #  remote: zmkfirmware
-    #  revision: main
-    #  import: app/west.yml
+    # Latest stable ZMK release (Zephyr 3.5). main is on Zephyr 4.x and unreleased.
     - name: zmk
-      remote: badjeff
-      revision: feat/pointers-with-input-processors
+      remote: zmkfirmware
+      revision: v0.3
       import: app/west.yml
-    - name: zmk-input-behavior-listener
-      remote: badjeff
-      revision: main
-    - name: zmk-split-peripheral-output-relay
-      remote: badjeff
-      revision: main
     - name: cirque-input-module
-      remote: badjeff
+      remote: petejohanson
       revision: main
     - name: nice-view-battery
       remote: infely

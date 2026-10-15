@@ -47,12 +47,7 @@
 };
 
 / {
-    /* Virtual input device for keymap binding compatibility (left side equivalent) */
-	glidepoint1: virtual_input {
-		compatible = "zmk,virtual-input";
-	};
-
-    /* Native ZMK split input support - peripheral sends physical glidepoint to central */
+    /* Peripheral side of the split input: forwards the physical glidepoint to the central */
     split_inputs {
         #address-cells = <1>;
         #size-cells = <0>;

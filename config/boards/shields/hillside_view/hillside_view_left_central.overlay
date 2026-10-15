@@ -58,11 +58,6 @@
         };
     };
 
-    /* Virtual input device for keymap compatibility - matches dongle pattern */
-    glidepoint1: virtual_input {
-        compatible = "zmk,virtual-input";
-    };
-
     /* Input listener for received pointer events from right trackpad - matches dongle pattern */
     glidepoint_input_listener: glidepoint_input {
         compatible = "zmk,input-listener";

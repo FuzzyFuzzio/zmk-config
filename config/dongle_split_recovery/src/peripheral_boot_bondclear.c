@@ -89,6 +89,12 @@ static void schedule_unpair(const char *reason)
             reason, POS_A, POS_B);
 }
 
+static void disconnect_conn(struct bt_conn *conn, void *data)
+{
+    ARG_UNUSED(data);
+    bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+}
+
 static void do_unpair_work(struct k_work *w)
 {
     ARG_UNUSED(w);
@@ -103,12 +109,7 @@ static void do_unpair_work(struct k_work *w)
     /* Drop any active connection so the central sees the bond loss
      * immediately and we re-pair on its next connect attempt.
      */
-    struct bt_conn *conn = bt_conn_lookup_state_le(BT_ID_DEFAULT, NULL,
-                                                   BT_CONN_STATE_CONNECTED);
-    if (conn) {
-        bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-        bt_conn_unref(conn);
-    }
+    bt_conn_foreach(BT_CONN_TYPE_LE, disconnect_conn, NULL);
 }
 static K_WORK_DELAYABLE_DEFINE(unpair_work, do_unpair_work);
 
