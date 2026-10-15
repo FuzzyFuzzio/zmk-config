@@ -5,10 +5,11 @@ manifest:
     - name: geratrevino115
       url-base: https://github.com/geratrevino115
   projects:
-    # Unreleased development branch (Zephyr 4.1). Pin to v0.4 once it is released.
+    # ZMK main (Zephyr 4.1), pinned to 4dd95d7 (2026-10-09). To update, change this SHA and the
+    # matching @ref in .github/workflows/build.yml together. Switch both to v0.4 once released.
     - name: zmk
       remote: zmkfirmware
-      revision: main
+      revision: 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85
       import: app/west.yml
     # LVGL 9 port of infely/nice-view-battery (upstream is LVGL 8 only)
     - name: nice-view-battery
