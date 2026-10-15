@@ -1,5 +1,5 @@
 description: |
-  Carries the toggled (non-momentary) layer from the split central to peripherals so a
+  Carries the highest active layer from the split central to peripherals so a
   peripheral display can show it. Global locality: invoking it on the central also runs it
   on every connected peripheral.
 

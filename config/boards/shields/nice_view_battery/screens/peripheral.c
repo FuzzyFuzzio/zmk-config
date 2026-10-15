@@ -119,7 +119,7 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_peripheral_status, struct peripheral_status_s
 ZMK_SUBSCRIPTION(widget_peripheral_status, zmk_split_peripheral_status_changed);
 
 #if IS_ENABLED(CONFIG_ZMK_LAYER_SYNC)
-// Layer status (toggled layer, mirrored from the central)
+// Layer status (highest active layer, mirrored from the central)
 
 static void set_layer_status(struct zmk_widget_screen *widget, struct layer_status_state state) {
     widget->state.layer_label = state.label;

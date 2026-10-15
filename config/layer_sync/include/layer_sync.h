@@ -3,7 +3,7 @@
 #include <zephyr/kernel.h>
 #include <zmk/event_manager.h>
 
-/* Raised on a split peripheral when the central reports a new toggled layer index. */
+/* Raised on a split peripheral when the central reports a new active layer index. */
 struct zmk_layer_sync_changed {
     uint8_t layer;
 };
