@@ -2,8 +2,6 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
-    - name: geratrevino115
-      url-base: https://github.com/geratrevino115
   projects:
     # ZMK main (Zephyr 4.1), pinned to 4dd95d7 (2026-10-09). To update, change this SHA and the
     # matching @ref in .github/workflows/build.yml together. Switch both to v0.4 once released.
@@ -11,9 +9,5 @@ manifest:
       remote: zmkfirmware
       revision: 4dd95d7840eb3d5a3f59bb29fbf1ab054715ef85
       import: app/west.yml
-    # LVGL 9 port of infely/nice-view-battery (upstream is LVGL 8 only)
-    - name: nice-view-battery
-      remote: geratrevino115
-      revision: d1f68d33cd15c1df5ac6c487872a3a2ace8f8f33
   self:
     path: config

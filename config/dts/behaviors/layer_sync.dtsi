@@ -1,0 +1,9 @@
+/ {
+    behaviors {
+        /* Node name is sent to peripherals by name; split caps it at 8 characters */
+        lyr_sync: lyr_sync {
+            compatible = "zmk,behavior-layer-sync";
+            #binding-cells = <1>;
+        };
+    };
+};

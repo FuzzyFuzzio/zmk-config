@@ -1,0 +1,4 @@
+config ZMK_LAYER_SYNC
+    bool "Mirror the toggled layer to split peripherals for display"
+    default y
+    depends on ZMK_SPLIT && DT_HAS_ZMK_BEHAVIOR_LAYER_SYNC_ENABLED
