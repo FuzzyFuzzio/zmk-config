@@ -56,10 +56,6 @@ if ZMK_DISPLAY
 config ZMK_DISPLAY_BLANK_ON_IDLE
   default n
 
-# LVGL 9 needs a bigger heap than LVGL 8 (matches ZMK's nice_view shield)
-config LV_Z_MEM_POOL_SIZE
-    default 5120 if ZMK_DISPLAY_STATUS_SCREEN_BUILT_IN
-
 config SPI
     default y
 
