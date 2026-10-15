@@ -147,6 +147,11 @@ ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_sync_changed);
 
 int zmk_widget_screen_init(struct zmk_widget_screen *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);
+    // LVGL 9's default theme adds a dark background, border and padding to plain objects
+    lv_obj_remove_style_all(widget->obj);
+    lv_obj_set_style_bg_color(widget->obj, LVGL_BACKGROUND, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(widget->obj, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_clear_flag(widget->obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(widget->obj, 160, 68);
 
     lv_obj_t *top = lv_canvas_create(widget->obj);
