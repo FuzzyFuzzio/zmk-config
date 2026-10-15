@@ -24,7 +24,7 @@ This configuration uses an `nrf52840_mdk_usb_dongle` as the central, with both h
 | Left half | `nice_nano//zmk` | `hillside_view_left nice_view_battery` |
 | Right half | `nice_nano//zmk` | `hillside_view_right` |
 | Left as central (no dongle) | `nice_nano//zmk` | `hillside_view_left_central nice_view_battery` |
-| Dongle | `nrf52840_mdk_usb_dongle` | `keyboard_dongle` |
+| Dongle | `nrf52840_mdk_usb_dongle//zmk` | `keyboard_dongle` |
 | Settings reset (optional) | `nice_nano//zmk` | `settings_reset` |
 
 ### Flash Order
