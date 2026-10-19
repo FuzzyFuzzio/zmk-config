@@ -13,7 +13,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/ble.h>
 #include <zmk/battery.h>
 
-#include "peripheral.h"
+#include "screen.h"
 #include "../widgets/output.h"
 #include "../widgets/battery.h"
 

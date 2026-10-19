@@ -16,7 +16,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
 
-#include "central.h"
+#include "screen.h"
 #include "../widgets/output.h"
 #include "../widgets/battery.h"
 #include "../widgets/profile.h"

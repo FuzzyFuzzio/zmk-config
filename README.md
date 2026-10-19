@@ -8,48 +8,41 @@ Layout tool: https://nickcoutsos.github.io/keymap-editor/
 ![layer3](<./visualization/right layer.png>)
 ![layer4](<./visualization/func layer.png>)
 
-## Dongle-Based Split Setup
+## Setup
 
-This configuration uses an `nrf52840_mdk_usb_dongle` as the central, with both halves (`hillside_view_left` and `hillside_view_right`) acting as peripherals. Pointer events (glidepoint/cirque) and keys are relayed to the dongle via **native ZMK split input support**.
+Firmware is built for two modes by [build.yaml](build.yaml) (ZMK v0.3, see [config/west.yml](config/west.yml)).
+The right half is the same in both.
 
-### Architecture
-- **Central**: USB dongle (connects to host via USB only, no BLE to host)
-- **Peripherals**: Left and right halves (connect to central via BLE split protocol)
-- **Pointer relay**: Uses native `CONFIG_ZMK_INPUT_SPLIT` (ZMK PR #2477) instead of external relay modules
-  - Right physical glidepoint: `reg = <1>` 
-  - Left virtual input: `reg = <0>` (for keymap binding symmetry)
+| Mode | Device | Board | Shield |
+| ---- | ------ | ----- | ------ |
+| Dongle | Dongle (central, USB to host) | `nrf52840_mdk_usb_dongle` | `keyboard_dongle` |
+| Dongle | Left half (peripheral, nice!view) | `nice_nano_v2` | `hillside_view_left nice_view_battery` |
+| No dongle | Left half (central, BLE to host, nice!view) | `nice_nano_v2` | `hillside_view_left_central nice_view_battery` |
+| Both | Right half (peripheral, Cirque trackpad) | `nice_nano_v2` | `hillside_view_right` |
+| Utility | Settings reset | `nice_nano_v2` / `nrf52840_mdk_usb_dongle` | `settings_reset` |
 
-### Build Targets
-| Device | Board | Shield |
-| ------ | ------ | ------ |
-| Left half | `nice_nano_v2` | `hillside_view_left nice_view_battery` |
-| Right half | `nice_nano_v2` | `hillside_view_right nice_view_battery` |
-| Dongle | `nrf52840_mdk_usb_dongle` | `keyboard_dongle` |
-| Settings reset (optional) | `nice_nano_v2` | `settings_reset` |
+### Trackpad
+The right half's Cirque glidepoint is forwarded to the central with native ZMK split input
+(`zmk,input-split`, `reg = <1>` on both sides). The peripheral inverts Y before sending; the central's
+input listener scales movement 2x and turns it into scrolling on layer 3 (Mouse).
 
-### Flash Order
-1. (Optional) Flash `settings_reset` onto each half to clear prior bonds. Then re-flash their normal firmware.
-2. Flash left and right halves.
-3. Flash dongle.
+### Layer display
+The central mirrors its highest active layer to the peripherals ([config/layer_sync](config/layer_sync)),
+so the left half's nice!view shows the current layer in dongle mode too.
 
-### Pairing Steps
-1. Plug in dongle (central) via USB.
-2. Power both halves. They will attempt to connect to the central automatically (split bond creation).
-3. Put the dongle into BLE pairing mode (use a key mapped to `&bluetooth` or bootloader/pair combo if defined; otherwise temporarily build a keymap with a pairing key).
-4. Pair the host computer to the dongle. Do NOT pair the halves directly to the host.
-5. After pairing, key presses and pointing events from both halves should appear on the host.
+### Flashing
+1. (Optional) Flash `settings_reset` to every device that should forget old bonds, then re-flash its normal firmware.
+2. Flash the halves, then the central (dongle or left central).
+3. Power everything on; the halves bond to the central automatically. In dongle mode the host only needs USB.
 
-### Verifying Pointer Relay
-Right side: physical glidepoint (`glidepoint0`) -> split input `reg=<1>` -> resurrected as `glidepoint_right` on dongle.
-Left side: virtual input only (no hardware) -> split input `reg=<0>` -> resurrected as `glidepoint_left` on dongle for keymap binding symmetry.
-
-If pointer input from the right half is missing:
-- Confirm both halves show connected status (LED behavior or via logs if enabled).
-- Ensure `reg` values match between peripheral and central overlays.
-- Confirm `CONFIG_ZMK_INPUT_SPLIT=y` and `CONFIG_ZMK_POINTING=y` are set.
+### Bond recovery
+- **Dongle (automatic)**: on key errors, MIC failures or repeated disconnects before encryption, the dongle drops
+  that half's bond so the next connection re-pairs ([dongle_bond_autoheal.c](config/dongle_split_recovery/src/dongle_bond_autoheal.c)).
+- **Peripheral halves (manual)**: hold the half's top and bottom outer-column keys while switching it on, or
+  hold them for 5 s at any time, to wipe its bonds and re-pair
+  ([peripheral_boot_bondclear.c](config/dongle_split_recovery/src/peripheral_boot_bondclear.c)).
+- If all else fails, flash `settings_reset` to the halves and the dongle.
 
 ### Troubleshooting
-- Stale bonds: Use `settings_reset` target and re-flash.
-- Host sees two devices: Remove old bond to a former central (e.g., left half) from OS BT settings.
-- No USB output: Verify dongle shield config has `CONFIG_ZMK_USB=y` and board supports USB (it does).
-
+- Host sees two keyboards: remove the old bond to a former central (e.g. the left half) from the OS Bluetooth settings.
+- No trackpad input: check that both halves show connected and that the `reg` values in the right and central overlays match.

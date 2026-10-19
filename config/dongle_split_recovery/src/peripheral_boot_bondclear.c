@@ -80,15 +80,6 @@ static atomic_t fired       = ATOMIC_INIT(0);
  */
 static atomic_t window_open = ATOMIC_INIT(1);
 
-static void schedule_unpair(const char *reason)
-{
-    if (!atomic_cas(&fired, 0, 1)) {
-        return;
-    }
-    LOG_WRN("%s: combo (pos %d + pos %d) detected, scheduling unpair",
-            reason, POS_A, POS_B);
-}
-
 static void disconnect_conn(struct bt_conn *conn, void *data)
 {
     ARG_UNUSED(data);
@@ -113,6 +104,16 @@ static void do_unpair_work(struct k_work *w)
 }
 static K_WORK_DELAYABLE_DEFINE(unpair_work, do_unpair_work);
 
+static void schedule_unpair(const char *reason)
+{
+    if (!atomic_cas(&fired, 0, 1)) {
+        return;
+    }
+    LOG_WRN("%s: combo (pos %d + pos %d) detected, scheduling unpair",
+            reason, POS_A, POS_B);
+    k_work_schedule(&unpair_work, K_MSEC(250));
+}
+
 /* Panic-hold delayed work: armed when both trigger keys go down outside
  * the boot window, cancelled the moment either key releases. If it
  * fires, the combo was held continuously for HOLD_MS.
@@ -128,7 +129,6 @@ static void panic_hold_work(struct k_work *w)
         return;
     }
     schedule_unpair("Panic hold");
-    k_work_schedule(&unpair_work, K_MSEC(250));
 }
 static K_WORK_DELAYABLE_DEFINE(panic_work, panic_hold_work);
 
@@ -175,11 +175,10 @@ static int position_listener(const zmk_event_t *eh)
 
     /* Boot window: any simultaneous press triggers immediately. */
     if (atomic_get(&window_open) && both_down) {
-        schedule_unpair("Boot bondclear");
         atomic_set(&window_open, 0);
         k_work_cancel_delayable(&close_window);
         k_work_cancel_delayable(&panic_work);
-        k_work_schedule(&unpair_work, K_MSEC(250));
+        schedule_unpair("Boot bondclear");
         return ZMK_EV_EVENT_BUBBLE;
     }
 

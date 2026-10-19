@@ -73,16 +73,6 @@ config SPI
 config LS0XX
     default y
 
-# config ZMK_WIDGET_WPM_STATUS
-#   default y if !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
-
-config LV_Z_BITS_PER_PIXEL
-    default 1
-
-choice LV_COLOR_DEPTH
-    default LV_COLOR_DEPTH_1
-endchoice
-
 endif # ZMK_DISPLAY
 
 if LVGL
