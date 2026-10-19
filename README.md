@@ -37,6 +37,12 @@ The right half's Cirque glidepoint is forwarded to the central with native ZMK s
 (`zmk,input-split`, `reg = <1>` on both sides). The peripheral inverts Y before sending; the central's
 input listener scales movement 2x and turns it into scrolling on layer 3 (Mouse).
 
+The Cirque driver's ZMK idle-sleep integration is disabled on the right half.
+Upstream [disabled it by default](https://github.com/petejohanson/cirque-input-module/commit/b4c4f8135ed2)
+because wake is unreliable. The trackpad's devicetree `sleep` option is also absent.
+This avoids trackpad sleep transitions during normal operation; ZMK's keyboard-level
+deep sleep remains enabled. Keeping the trackpad awake may increase idle battery use.
+
 ### Layer display
 The central mirrors its highest active layer to the peripherals ([layer_sync](layer_sync)),
 so the left half's nice!view shows the current layer in dongle mode too.
@@ -70,3 +76,12 @@ The Cirque driver is pinned in [config/west.yml](config/west.yml) for reproducib
 ### Troubleshooting
 - Host sees two keyboards: remove the old bond to a former central (e.g. the left half) from the OS Bluetooth settings.
 - No trackpad input: check that both halves show connected and that the `reg` values in the right and central overlays match.
+- Trackpad stops until the right half is power-cycled: the disabled Cirque idle-sleep
+  integration is a mitigation, not a confirmed diagnosis. After flashing the right half,
+  test continuous pointer use, typing/scrolling together, more than 30 minutes idle
+  followed by a right-half keypress and pointer movement, and a battery-powered
+  deep-sleep/wake cycle (more than two hours idle, then wake with a key).
+  If it recurs, record whether right-half keys still work, whether it followed idle
+  or deep sleep, and whether typing on the right half restores the pointer.
+  Working right-half keys with a dead pointer helps distinguish a local trackpad
+  failure from loss of the whole split connection. Do not reset bonds just for this test.
