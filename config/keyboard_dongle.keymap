@@ -1,4 +1,3 @@
 // keyboard_dongle uses the shared hillside_view keymap
-#include "../../../hillside_view.keymap"
-
+#include "hillside_view.keymap"
 

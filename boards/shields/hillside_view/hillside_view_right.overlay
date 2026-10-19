@@ -27,16 +27,12 @@
   status = "okay";
 };
 
-&chosen {
-  zephyr,display = &nice_view;
-};
-
 &nice_view_spi {
-  status = "okay";
+  status = "disabled";
 };
 
 &nice_view {
-  status = "okay";
+  status = "disabled";
 };
 
 &i2c0 {

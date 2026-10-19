@@ -17,7 +17,7 @@ config ZMK_SPLIT
 # Do NOT set ZMK_SPLIT_ROLE_CENTRAL - absence means peripheral role
 
 # Enable the peripheral-side bond clear escape hatch. There are two
-# trigger modes (see config/dongle_split_recovery/):
+# trigger modes (see dongle_split_recovery/):
 #   * Boot window: hold the trigger combo while powering the half on.
 #   * Panic hold: hold the trigger combo for several seconds at any
 #     time during normal operation.

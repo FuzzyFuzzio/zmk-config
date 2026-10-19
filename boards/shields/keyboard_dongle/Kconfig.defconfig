@@ -20,7 +20,7 @@ config ZMK_SPLIT_BLE_CENTRAL_PERIPHERALS
 
 # Enable the dongle-side automatic bond recovery. Catches BLE security
 # failures with a split peripheral and clears the stale bond so the next
-# connection re-pairs cleanly. See config/dongle_split_recovery/.
+# connection re-pairs cleanly. See dongle_split_recovery/.
 config DONGLE_BOND_AUTOHEAL
     default y
 

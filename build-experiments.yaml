@@ -1,0 +1,37 @@
+# Built only by workflow_dispatch with ble_experiments enabled.
+# Baseline firmware is built from build.yaml in the same workflow run.
+include:
+  - board: nrf52840_mdk_usb_dongle
+    shield: keyboard_dongle
+    snippet: ble-low-latency
+    artifact-name: keyboard_dongle-ble-low-latency
+
+  - board: nice_nano_v2
+    shield: hillside_view_left_central nice_view_battery
+    snippet: ble-low-latency
+    artifact-name: hillside_view_left_central-ble-low-latency
+
+  - board: nrf52840_mdk_usb_dongle
+    shield: keyboard_dongle
+    snippet: ble-tx-headroom
+    artifact-name: keyboard_dongle-ble-tx-headroom
+
+  - board: nice_nano_v2
+    shield: hillside_view_left_central nice_view_battery
+    snippet: ble-tx-headroom
+    artifact-name: hillside_view_left_central-ble-tx-headroom
+
+  - board: nice_nano_v2
+    shield: hillside_view_right
+    snippet: ble-tx-headroom
+    artifact-name: hillside_view_right-ble-tx-headroom
+
+  - board: nrf52840_mdk_usb_dongle
+    shield: keyboard_dongle
+    snippet: ble-low-latency ble-tx-headroom
+    artifact-name: keyboard_dongle-ble-combined
+
+  - board: nice_nano_v2
+    shield: hillside_view_left_central nice_view_battery
+    snippet: ble-low-latency ble-tx-headroom
+    artifact-name: hillside_view_left_central-ble-combined
