@@ -53,9 +53,99 @@ sampling while idle, so press a key on a half to refresh its reading after charg
 With the standard HillSideView battery wiring, the half's switch must be **ON** to charge.
 
 ### Trackpad
-The right half's Cirque glidepoint is forwarded to the central with native ZMK split input
+The right half's Cirque glidepoint uses ZMK split input devices
 (`zmk,input-split`, `reg = <1>` on both sides). The peripheral inverts Y before sending; the central's
 input listener scales movement 2x and turns it into scrolling on layer 3 (Mouse).
+
+The pinned driver and ZMK input paths are patched by [trackpad/CMakeLists.txt](trackpad/CMakeLists.txt)
+using [cirque-pinnacle.patch](trackpad/cirque-pinnacle.patch) and
+[zmk-input-frames.patch](trackpad/zmk-input-frames.patch). Patching happens in a
+private build-directory copy, never in the west module checkout, and fails the build
+if the patch cannot be applied. The module dependency ensures the original driver is
+registered before its source is replaced, so only the patched copy is compiled.
+The fixes:
+
+- Follow Cirque's STOP-delimited I2C register-read sequence, rather than using a
+  combined write/repeated-START/read transaction. See section 8.1 of
+  [Cirque's Pinnacle interface guide](https://www.dropbox.com/s/0g2b2ysrly41hi8/GT-AN-090620%20InterfacingtoPinnacle_I2C-SPI.pdf?dl=0).
+- Validate the relative packet's fixed header bits before decoding it. Malformed
+  samples are acknowledged and discarded, not forwarded as movement or clicks
+  and not retried indefinitely as the same corrupt packet.
+- Clear command-complete interrupts even when no movement packet is ready.
+  Calibration and power-on reset can assert the same hardware data-ready line as
+  pointer data; leaving that flag set prevents the next rising edge.
+- Decode relative X/Y using the separate sign flags and full movement bytes, rather
+  than narrowing to `int8_t`. Large positive movements previously reversed direction.
+  Signed zero stays zero.
+- Retry failed reads and status acknowledgements even if data-ready remains high
+  without another interrupt edge. Retries back off from 5 ms to 250 ms on persistent
+  errors; valid packets are emitted only after acknowledgement succeeds. A data-ready
+  check also catches samples arriving during processing, startup, or device resume.
+- Disable GlideExtend, which otherwise continues movement at the pad edge. Normal
+  tap-to-click, Y orientation, 2x pointer scaling, and layer-3 scrolling are unchanged.
+- Bound extended-register polling to 100 ms and calibration/reset polling to 500 ms,
+  sleeping between polls and propagating read errors. A poll deadline can overshoot
+  by an in-flight bus transfer's own timeout; it is not a hard real-time guarantee.
+- Check required writes/readbacks, bus/GPIO readiness, and GPIO/callback setup.
+  Work/state are initialized before callbacks, interrupts remain disabled throughout
+  setup, and the data feed is enabled last. Missing data-ready pins or out-of-byte-range
+  edge thresholds fail compilation instead of using invalid defaults.
+- Run sensor I/O on a dedicated worker. Suspend disables interrupts and synchronously
+  drains that worker; resume polls for an already-pending sample. Sleep register
+  access is serialized with report reads. SPI write failures return before inspecting
+  an undefined receive buffer.
+- Inspect command-complete events for lost feed settings, restore pointer/feature
+  registers, discard the old sample, and release cached buttons after recovery.
+  This is feed recovery, not a new sensor calibration or a guarantee that a reset
+  under a finger produced a good analog calibration.
+- Disable the unused IntelliMouse/hardware scrolling modes. Hardware wheel bytes
+  were not consumed by this driver; scrolling is still provided by layer 3.
+- Acknowledge but do not forward unchanged zero-motion frames.
+
+The protocol and hardening fixes do not change ADC sensitivity, hardware filtering,
+sample rate, or automatic compensation. They do not force calibration during use:
+Cirque warns that calibrating with a finger on the pad can itself spoil tracking.
+
+#### Complete-frame split delivery
+
+[trackpad_frames.c](trackpad/src/trackpad_frames.c) sends each sample as one versioned,
+12-byte BLE notification containing both axes, the complete button state, and a
+sequence number. This fits the default ATT payload without increasing the MTU.
+The relay is intentionally limited to one split trackpad; multiple split input
+devices fail compilation rather than sharing one overflow/button-state snapshot.
+Normal movement needs one notification rather than separate X and Y notifications;
+button changes do not need extra notifications. Duplicate frames are ignored and
+sequence gaps are logged. The new central still accepts legacy 8-byte events, but
+the complete-frame reliability guarantees require updated firmware at both ends.
+Input and unsubscribe callbacks must still belong to the active connection, so
+late callbacks cannot inject motion or clear a newly reused subscription.
+
+Each side has a dedicated delivery worker, a 32-frame queue, and one latest-overflow
+snapshot. Congestion never blocks the sensor worker on Bluetooth. Failed delivery
+is retried with 5-250 ms backoff. Motion already 50 ms old when the delivery worker
+attempts it is discarded, while button state is retained. This limits replay from
+our queue, not time spent inside Bluetooth or host stacks. Stale snapshots coalesce
+to the latest button state too, rather than replaying historical taps as phantom
+clicks after a stalled link. Queue overflow is
+logged and coalesces the overflow to the latest complete snapshot: under sustained
+overload or stale delivery, intermediate movement and clicks may be lost, but a queued final release
+is not silently replaced by a held-button default. This bounded policy does not
+promise lossless delivery during an indefinitely broken radio/host connection.
+An enqueue concurrent with a failed send cannot bypass the retry backoff: an
+absolute retry deadline also rejects callbacks that Zephyr had already submitted.
+
+At the central, complete frames cannot lose a final sync through a non-blocking
+queue insertion. A partial downstream input failure is explicitly cleared from the
+listener before retry, preventing duplicated movement. A split disconnect queues
+a button-release snapshot. Zephyr's Bluetooth/input calls can still wait inside the
+dedicated delivery worker; queue/stale-motion diagnostics expose congestion without
+stalling unrelated system work.
+
+**Flash the updated central first, then the right half:** the dongle in dongle mode,
+or the left-central half in no-dongle mode. The left peripheral does not need flashing
+for these trackpad changes. An old central cannot decode the new right-half frames.
+No bond reset is required. Hardware testing is still needed to validate the complete
+motion path, tapping/dragging, scrolling, congestion recovery, and deep-sleep/wake.
 
 The Cirque driver's ZMK idle-sleep integration is disabled on the right half.
 Upstream [disabled it by default](https://github.com/petejohanson/cirque-input-module/commit/b4c4f8135ed2)
@@ -79,12 +169,44 @@ The build workflow produces one `firmware` archive with the six targets in
 [build.yaml](build.yaml), covering both modes and settings-reset utilities.
 BLE interval, latency, PHY, and TX buffer settings retain their baseline values.
 The Cirque driver is pinned in [config/west.yml](config/west.yml) for reproducible builds.
+Recheck both local trackpad patches and their regression tests before updating the pins.
+CI runs the host suites against both manifest-selected upstream checkouts before
+starting firmware builds.
 
 Host regression tests for the battery relay and label formatting are in
 [tests/test_battery_sync.py](tests/test_battery_sync.py). Run
 `python -m unittest discover -s tests -p test_battery_sync.py` with a GCC/Clang-compatible
 `CC`, or the `ziglang` Python package installed. These simulate Zephyr/Bluetooth calls
 and do not replace the firmware builds or a hardware connection test.
+
+Trackpad regression tests in [tests/test_trackpad.py](tests/test_trackpad.py) compile
+the real patched driver against simulated I/O. Set `CIRQUE_MODULE_DIR` to the pinned
+`cirque-input-module` checkout and `ZMK_MODULE_DIR` to the ZMK checkout, then run
+`python -m unittest discover -s tests -v` to run all suites. Git and the same host
+compiler support are required. Missing upstream paths fail the tests rather than
+silently skipping coverage. The driver suite checks all movement-byte/sign
+combinations, signed zero, read/acknowledgement failures, recovery without a new edge,
+retry backoff, interrupt races, button release, startup, and device suspend/resume.
+They also exercise the actual I2C read helper, all 256 packet headers, command-complete
+interrupts with and without pointer data, and slow input delivery diagnostics. The
+STOP-sequence regression fails against the first version of the trackpad patch.
+It also checks busy-register deadlines, setup/readback failures, readiness, safe
+callback ordering, synchronous cancellation, SPI errors, lost-feed recovery and empty
+frames. [Frame tests](tests/test_trackpad_frames.py) exercise peripheral and central
+queue roles, exact 12-byte format, duplicate/wrapping/gapped sequences, the 49/50 ms
+stale-motion boundary, backoff, overflow coalescing and retained button releases.
+[Split tests](tests/test_trackpad_split.py) compile the real patched ZMK proxy and
+listener functions and inject a failure between X and Y/sync to check clean replay.
+
+For a right-half USB diagnostic build, use ZMK's existing `zmk-usb-logging` snippet
+(`west build -S zmk-usb-logging`) to supply the CDC UART devicetree node, and add
+`-DEXTRA_CONF_FILE=<repository-root>/trackpad/diagnostics.conf` to its CMake arguments.
+This opt-in configuration enables warning/error-only USB serial logs without the
+per-packet debug stream. Flash that right-half build, connect it to a USB data port,
+and open its serial console (115200 baud) to capture a failure. Normal firmware does
+not enable USB logging. With logging enabled, the driver also warns if local input
+delivery takes at least 50 ms; this can expose backpressure between the trackpad and
+split forwarding without changing report delivery or dropping half of an X/Y pair.
 
 ### Flashing
 1. (Optional) Flash `settings_reset` to every device that should forget old bonds, then re-flash its normal firmware.
@@ -102,6 +224,25 @@ and do not replace the firmware builds or a hardware connection test.
 ### Troubleshooting
 - Host sees two keyboards: remove the old bond to a former central (e.g. the left half) from the OS Bluetooth settings.
 - No trackpad input: check that both halves show connected and that the `reg` values in the right and central overlays match.
+- Erratic paths or a freeze followed by a large jump: flash the patched right-half
+  and active-central firmware, then test slow straight lines, fast swipes in both directions, edge
+  movement, repeated lift/re-touch after a second, and pointer use while typing.
+  Verify tap-to-click and layer-3 scrolling still work. Test in the mode you use
+  (dongle or left central); latency and pointer speed were not intentionally changed.
+  If it persists, record whether right-half keys still respond during the freeze,
+  whether it happens on USB power or battery, and whether it occurs away from the
+  pad edges. With right-half USB logging enabled, look for `read status`,
+  `read packet`, `Invalid STATUS1`, `Invalid relative packet`, or
+  `Failed to clear STATUS1` errors. Persistent errors can indicate an I2C, power,
+  or physical connection problem; software retries cannot repair a broken link.
+- Tracking that only recovers after lifting the finger for 2-3 seconds is not yet a
+  confirmed software diagnosis. Use the hardened right-half and active-central builds.
+  Keep the pad untouched during startup calibration. If the issue remains, capture
+  the diagnostic USB logs and whether right-half keys continue to respond.
+  `Pinnacle command complete` records a calibration/reset interrupt, not proof of
+  which event caused it; `Pinnacle input delivery blocked` records local queue
+  backpressure, not a measurement of host cursor latency. Clean logs do not rule
+  out a sensor/overlay/grounding problem or loss farther down the split link.
 - Trackpad stops until the right half is power-cycled: the disabled Cirque idle-sleep
   integration is a mitigation, not a confirmed diagnosis. After flashing the right half,
   test continuous pointer use, typing/scrolling together, more than 30 minutes idle

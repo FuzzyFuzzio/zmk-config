@@ -1,0 +1,265 @@
+diff --git a/src/pointing/input_listener.c b/src/pointing/input_listener.c
+index 28f2530..e8617cc 100644
+--- a/src/pointing/input_listener.c
++++ b/src/pointing/input_listener.c
+@@ -18,6 +18,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ 
+ #include <zmk/endpoints.h>
+ #include <drivers/input_processor.h>
++#include <trackpad_frames.h>
+ #include <zmk/pointing.h>
+ 
+ #if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+@@ -265,6 +266,12 @@ static void apply_resolution_scaling(struct input_listener_data *data, struct in
+ 
+ static void input_handler(const struct input_listener_config *config,
+                           struct input_listener_data *data, struct input_event *evt) {
++    if (evt->type == TRACKPAD_INPUT_RESET_TYPE) {
++        clear_xy_data(&data->mouse.data);
++        clear_xy_data(&data->mouse.wheel_data);
++        data->mouse.button_set = data->mouse.button_clear = 0;
++        return;
++    }
+     // First, process to update the event data as needed.
+     int ret = filter_with_input_config(config, data, evt);
+ 
+diff --git a/src/pointing/input_split.c b/src/pointing/input_split.c
+index 615790a..1505142 100644
+--- a/src/pointing/input_split.c
++++ b/src/pointing/input_split.c
+@@ -10,6 +10,7 @@
+ #include <zephyr/device.h>
+ #include <zephyr/input/input.h>
+ #include <drivers/input_processor.h>
++#include <trackpad_frames.h>
+ 
+ #include <zephyr/logging/log.h>
+ 
+@@ -20,11 +21,62 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ struct zis_entry {
+     uint8_t reg;
+     const struct device *dev;
++    uint8_t buttons;
++    bool needs_reset;
+ };
+ 
+ #define ZIS_ENTRY(n) {.reg = DT_INST_REG_ADDR(n), .dev = DEVICE_DT_GET(DT_DRV_INST(n))},
+ 
+-static const struct zis_entry proxy_inputs[] = {DT_INST_FOREACH_STATUS_OKAY(ZIS_ENTRY)};
++static struct zis_entry proxy_inputs[] = {DT_INST_FOREACH_STATUS_OKAY(ZIS_ENTRY)};
++
++int trackpad_deliver_frame(uint8_t reg, const struct trackpad_wire_frame *frame) {
++    for (size_t i = 0; i < ARRAY_SIZE(proxy_inputs); i++) {
++        struct zis_entry *proxy = &proxy_inputs[i];
++        if (proxy->reg != reg) {
++            continue;
++        }
++        if (!proxy->needs_reset && frame->x == 0 && frame->y == 0 &&
++            proxy->buttons == frame->buttons) {
++            return 0;
++        }
++        int ret;
++        if (proxy->needs_reset) {
++            /* Clear an uncommitted listener sample before replaying a failed frame. */
++            ret = input_report(proxy->dev, TRACKPAD_INPUT_RESET_TYPE, 0, 0, false, K_FOREVER);
++            if (ret < 0) {
++                LOG_ERR("Failed to reset partial trackpad input: %d", ret);
++                return ret;
++            }
++            proxy->needs_reset = false;
++        }
++        for (int button = 0; button < 5; button++) {
++            if ((proxy->buttons ^ frame->buttons) & BIT(button)) {
++                ret = input_report_key(proxy->dev, INPUT_BTN_0 + button,
++                                            !!(frame->buttons & BIT(button)), false, K_FOREVER);
++                if (ret < 0) {
++                    goto failed;
++                }
++            }
++        }
++        ret = input_report_rel(proxy->dev, INPUT_REL_X, frame->x, false, K_FOREVER);
++        if (ret < 0) {
++            goto failed;
++        }
++        ret = input_report_rel(proxy->dev, INPUT_REL_Y, frame->y, true, K_FOREVER);
++        if (ret < 0) {
++            goto failed;
++        }
++        proxy->buttons = frame->buttons;
++        return 0;
++
++failed:
++        proxy->needs_reset = true;
++        LOG_ERR("Failed to deliver complete trackpad input: %d", ret);
++        return ret;
++    }
++    LOG_ERR("No split input for trackpad frame %u", reg);
++    return -ENODEV;
++}
+ 
+ int zmk_input_split_report_peripheral_event(uint8_t reg, uint8_t type, uint16_t code, int32_t value,
+                                             bool sync) {
+@@ -47,6 +99,7 @@ int zmk_input_split_report_peripheral_event(uint8_t reg, uint8_t type, uint16_t
+ #include <zmk/split/peripheral.h>
+ 
+ #define ZIS_INST(n)                                                                                \
++    static struct trackpad_frame_builder frame_builder_##n;                                       \
+     static const struct zmk_input_processor_entry processors_##n[] =                               \
+         COND_CODE_1(DT_INST_NODE_HAS_PROP(n, input_processors),                                    \
+                     ({LISTIFY(DT_INST_PROP_LEN(n, input_processors),                               \
+@@ -63,16 +116,10 @@ int zmk_input_split_report_peripheral_event(uint8_t reg, uint8_t type, uint16_t
+                 return;                                                                            \
+             }                                                                                      \
+         }                                                                                          \
+-        struct zmk_split_transport_peripheral_event ev = {                                         \
+-            .type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,                         \
+-            .data = {.input_event = {                                                              \
+-                         .reg = DT_INST_REG_ADDR(n),                                               \
+-                         .type = evt->type,                                                        \
+-                         .code = evt->code,                                                        \
+-                         .value = evt->value,                                                      \
+-                         .sync = evt->sync,                                                        \
+-                     }}};                                                                          \
+-        zmk_split_peripheral_report_event(&ev);                                                    \
++        int ret = trackpad_capture_event(DT_INST_REG_ADDR(n), &frame_builder_##n, evt);             \
++        if (ret < 0) {                                                                             \
++            LOG_ERR("Failed to capture trackpad frame: %d", ret);                                  \
++        }                                                                                          \
+     }                                                                                              \
+     INPUT_CALLBACK_DEFINE(DEVICE_DT_GET(DT_INST_PHANDLE(n, device)), split_input_handler_##n);
+ 
+diff --git a/src/split/bluetooth/central.c b/src/split/bluetooth/central.c
+index 685deb5..462b437 100644
+--- a/src/split/bluetooth/central.c
++++ b/src/split/bluetooth/central.c
+@@ -33,6 +33,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ #include <zmk/pointing/input_split.h>
+ #include <zmk/hid_indicators_types.h>
+ #include <zmk/physical_layouts.h>
++#include <trackpad_frames.h>
+ 
+ static int start_scanning(void);
+ 
+@@ -73,6 +74,7 @@ struct peripheral_input_slot {
+     struct bt_conn *conn;
+     struct bt_gatt_subscribe_params sub;
+     uint8_t reg;
++    struct trackpad_receiver frame_receiver;
+ };
+ 
+ #define COUNT_INPUT_SPLIT(n) +1
+@@ -94,6 +96,7 @@ static int reserve_next_open_input_slot(struct peripheral_input_slot **slot, str
+     for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
+         if (input_slot_is_open(i)) {
+             peripheral_input_slots[i].conn = conn;
++            peripheral_input_slots[i].frame_receiver.valid = false;
+ 
+             // Clear out any previously set values
+             peripheral_input_slots[i].sub.value_handle = 0;
+@@ -121,6 +124,9 @@ static int find_pending_input_slot(struct peripheral_input_slot **slot, struct b
+ void release_peripheral_input_subs(struct bt_conn *conn) {
+     for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
+         if (peripheral_input_slots[i].conn == conn) {
++            if (peripheral_input_slots[i].reg != 0) {
++                trackpad_release(peripheral_input_slots[i].reg);
++            }
+             peripheral_input_slots[i].conn = NULL;
+             // memset(&peripheral_input_slots[i], 0, sizeof(struct peripheral_input_slot));
+         }
+@@ -306,6 +312,18 @@ static uint8_t split_central_sensor_notify_func(struct bt_conn *conn,
+ static uint8_t peripheral_input_event_notify_cb(struct bt_conn *conn,
+                                                 struct bt_gatt_subscribe_params *params,
+                                                 const void *data, uint16_t length) {
++    struct peripheral_input_slot *slot = NULL;
++    for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
++        if (conn && peripheral_input_slots[i].conn == conn &&
++            &peripheral_input_slots[i].sub == params) {
++            slot = &peripheral_input_slots[i];
++            break;
++        }
++    }
++    if (!slot) {
++        LOG_WRN("Ignoring input callback from a stale/unmatched connection");
++        return BT_GATT_ITER_CONTINUE;
++    }
+     if (!data) {
+         LOG_DBG("[UNSUBSCRIBED]");
+         params->value_handle = 0U;
+@@ -314,6 +332,13 @@ static uint8_t peripheral_input_event_notify_cb(struct bt_conn *conn,
+ 
+     LOG_DBG("[INPUT EVENT] data %p length %u", data, length);
+ 
++    if (length == sizeof(struct trackpad_wire_frame)) {
++        int ret = trackpad_receive_frame(slot->reg, &slot->frame_receiver, data, length);
++        if (ret < 0) {
++            LOG_ERR("Rejected complete trackpad frame: %d", ret);
++        }
++        return BT_GATT_ITER_CONTINUE;
++    }
+     if (length != sizeof(struct zmk_split_input_event_payload)) {
+         LOG_WRN("Ignoring input event notify with incorrect data length (%d)", length);
+         return BT_GATT_ITER_STOP;
+@@ -322,24 +347,22 @@ static uint8_t peripheral_input_event_notify_cb(struct bt_conn *conn,
+     struct zmk_split_input_event_payload payload;
+     memcpy(&payload, data, MIN(length, sizeof(struct zmk_split_input_event_payload)));
+ 
+-    for (size_t i = 0; i < ARRAY_SIZE(peripheral_input_slots); i++) {
+-        if (&peripheral_input_slots[i].sub == params) {
+-            struct peripheral_event_wrapper event_wrapper = {
++    struct peripheral_event_wrapper event_wrapper = {
+                 .source = peripheral_slot_index_for_conn(conn),
+                 .event = {.type = ZMK_SPLIT_TRANSPORT_PERIPHERAL_EVENT_TYPE_INPUT_EVENT,
+                           .data = {.input_event = {
+-                                       .reg = peripheral_input_slots[i].reg,
++                                       .reg = slot->reg,
+                                        .sync = payload.sync,
+                                        .code = payload.code,
+                                        .type = payload.type,
+                                        .value = payload.value,
+                                    }}}};
+ 
+-            k_msgq_put(&peripheral_event_msgq, &event_wrapper, K_NO_WAIT);
+-            k_work_submit(&peripheral_event_work);
+-            break;
+-        }
++    int ret = k_msgq_put(&peripheral_event_msgq, &event_wrapper, K_NO_WAIT);
++    if (ret < 0) {
++        LOG_ERR("Legacy split input queue overflow: %d; update peripheral firmware", ret);
+     }
++    k_work_submit(&peripheral_event_work);
+ 
+     return BT_GATT_ITER_CONTINUE;
+ }
+diff --git a/src/split/bluetooth/service.c b/src/split/bluetooth/service.c
+index 5bbed13..9607097 100644
+--- a/src/split/bluetooth/service.c
++++ b/src/split/bluetooth/service.c
+@@ -27,6 +27,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+ #include <zmk/split/bluetooth/service.h>
+ 
+ #include "peripheral.h"
++#include <trackpad_frames.h>
+ 
+ #if IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
+ #include <zmk/events/hid_indicators_changed.h>
+@@ -332,6 +333,20 @@ static int zmk_split_bt_report_input(uint8_t reg, uint8_t type, uint16_t code, i
+     return -ENODEV;
+ }
+ 
++int trackpad_bt_send_frame(uint8_t reg, const struct trackpad_wire_frame *frame) {
++    if (!zmk_split_bt_peripheral_is_connected()) {
++        return -ENOTCONN;
++    }
++    for (size_t i = 0; i < split_svc.attr_count; i++) {
++        if (bt_uuid_cmp(split_svc.attrs[i].uuid,
++                        BT_UUID_DECLARE_128(ZMK_SPLIT_BT_INPUT_EVENT_UUID)) == 0 &&
++            (uint8_t)(uint32_t)split_svc.attrs[i + 2].user_data == reg) {
++            return bt_gatt_notify(NULL, &split_svc.attrs[i], frame, sizeof(*frame));
++        }
++    }
++    return -ENODEV;
++}
++
+ #endif /* IS_ENABLED(CONFIG_ZMK_INPUT_SPLIT) */
+ 
+ static int service_init(void) {

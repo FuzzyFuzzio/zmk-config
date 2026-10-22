@@ -1,6 +1,50 @@
 on: [push, pull_request, workflow_dispatch]
 
 jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Read pinned Cirque revision
+        id: cirque
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import re
+          manifest = Path("config/west.yml").read_text()
+          project = manifest.split("- name: cirque-input-module", 1)[1].split("\n    - name:", 1)[0]
+          revision = re.search(r"^\s+revision:\s*([a-f0-9]{40})\s*$", project, re.MULTILINE)
+          if revision is None:
+              raise ValueError("Cirque revision must be pinned to a full commit SHA")
+          zmk_project = manifest.split("- name: zmk\n", 1)[1].split("\n    - name:", 1)[0]
+          zmk_revision = re.search(r"^\s+revision:\s*(\S+)\s*$", zmk_project, re.MULTILINE)
+          if zmk_revision is None:
+              raise ValueError("Missing ZMK revision")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"revision={revision.group(1)}\n")
+              output.write(f"zmk_revision={zmk_revision.group(1)}\n")
+      - uses: actions/checkout@v4
+        with:
+          repository: petejohanson/cirque-input-module
+          ref: ${{ steps.cirque.outputs.revision }}
+          path: .ci-cirque
+      - uses: actions/checkout@v4
+        with:
+          repository: zmkfirmware/zmk
+          ref: ${{ steps.cirque.outputs.zmk_revision }}
+          path: .ci-zmk
+      - name: Run host fault and regression tests
+        env:
+          CC: gcc
+          CIRQUE_MODULE_DIR: ${{ github.workspace }}/.ci-cirque
+          ZMK_MODULE_DIR: ${{ github.workspace }}/.ci-zmk
+        run: python -m unittest discover -s tests -v
+
   build:
+    needs: host-tests
     # Keep in lockstep with the zmk revision in config/west.yml.
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3

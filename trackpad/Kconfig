@@ -1,0 +1,7 @@
+config ZMK_TRACKPAD_RELIABLE_SPLIT
+    bool "Complete-frame trackpad split delivery"
+    default y if SHIELD_HILLSIDE_VIEW_RIGHT || SHIELD_HILLSIDE_VIEW_LEFT_CENTRAL || SHIELD_KEYBOARD_DONGLE
+    depends on ZMK_INPUT_SPLIT && ZMK_SPLIT_BLE
+    help
+      Transfer complete pointer samples and button snapshots instead of independent
+      axis notifications. Requires updated firmware on the peripheral and central.
