@@ -1,0 +1,6 @@
+if(CONFIG_ZMK_BATTERY_SYNC)
+    zephyr_library()
+    zephyr_library_include_directories(${CMAKE_SOURCE_DIR}/include)
+    zephyr_include_directories(include)
+    zephyr_library_sources(src/battery_sync.c)
+endif()

@@ -2,6 +2,7 @@
 
 #include <dt-bindings/zmk/matrix_transform.h>
 #include <behaviors/layer_sync.dtsi>
+#include <behaviors/battery_sync.dtsi>
 
 / {
     chosen {

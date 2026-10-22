@@ -32,6 +32,26 @@ The ZMK v0.3 reusable build workflow detects this module automatically. For loca
 
 The right half has no display; its display stack and nice!view SPI bus are disabled.
 
+### Battery display
+The left display shows `(left / right)` percentages inside the battery image, for example
+`(25 / 18)`. The fill level and lightning bolt still refer to the left half; the bolt
+means USB power is present, not that the charger has confirmed current into the battery.
+`--` means the right reading is not available.
+
+This works in both modes. The right half exposes a read-only, encrypted battery
+characteristic. The central (dongle or left half) reads it approximately once per minute
+and mirrors it to the left display using [battery_sync](battery_sync). Identifying the
+right half by its characteristic avoids relying on BLE pairing order. Battery telemetry
+does not generate key or pointer activity and does not keep the keyboard awake.
+The right reading is cleared when its link to the central is lost, or when the left
+peripheral loses its link to the dongle.
+
+Flash the new firmware to **both halves and the dongle** for dongle mode, or to **both
+halves** for no-dongle mode. Older right-half firmware will show `--` on the new display.
+Battery values remain ZMK's voltage-based estimates; ZMK v0.3 pauses local battery
+sampling while idle, so press a key on a half to refresh its reading after charging.
+With the standard HillSideView battery wiring, the half's switch must be **ON** to charge.
+
 ### Trackpad
 The right half's Cirque glidepoint is forwarded to the central with native ZMK split input
 (`zmk,input-split`, `reg = <1>` on both sides). The peripheral inverts Y before sending; the central's
@@ -59,6 +79,12 @@ The build workflow produces one `firmware` archive with the six targets in
 [build.yaml](build.yaml), covering both modes and settings-reset utilities.
 BLE interval, latency, PHY, and TX buffer settings retain their baseline values.
 The Cirque driver is pinned in [config/west.yml](config/west.yml) for reproducible builds.
+
+Host regression tests for the battery relay and label formatting are in
+[tests/test_battery_sync.py](tests/test_battery_sync.py). Run
+`python -m unittest discover -s tests -p test_battery_sync.py` with a GCC/Clang-compatible
+`CC`, or the `ziglang` Python package installed. These simulate Zephyr/Bluetooth calls
+and do not replace the firmware builds or a hardware connection test.
 
 ### Flashing
 1. (Optional) Flash `settings_reset` to every device that should forget old bonds, then re-flash its normal firmware.

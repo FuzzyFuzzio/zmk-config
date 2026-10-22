@@ -1,2 +1,3 @@
 rsource "dongle_split_recovery/Kconfig"
 rsource "layer_sync/Kconfig"
+rsource "battery_sync/Kconfig"

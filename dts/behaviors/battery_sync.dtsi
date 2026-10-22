@@ -1,0 +1,8 @@
+/ {
+    behaviors {
+        bat_sync: bat_sync {
+            compatible = "zmk,behavior-battery-sync";
+            #binding-cells = <1>;
+        };
+    };
+};

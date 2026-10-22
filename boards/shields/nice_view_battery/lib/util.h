@@ -12,6 +12,7 @@
 
 struct status_state {
     uint8_t battery;
+    uint8_t right_battery;
     bool charging;
     const char *layer_label;
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)

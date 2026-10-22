@@ -1,2 +1,3 @@
 add_subdirectory(dongle_split_recovery)
 add_subdirectory(layer_sync)
+add_subdirectory(battery_sync)

@@ -1,0 +1,4 @@
+config ZMK_BATTERY_SYNC
+    bool "Mirror the right battery level to the left display"
+    default y
+    depends on ZMK_SPLIT_BLE && DT_HAS_ZMK_BEHAVIOR_BATTERY_SYNC_ENABLED

@@ -1,0 +1,5 @@
+description: Mirror the right-half battery percentage, or 255 when unavailable, to split peripherals.
+
+compatible: "zmk,behavior-battery-sync"
+
+include: one_param.yaml

@@ -1,6 +1,6 @@
 #include <zephyr/kernel.h>
+#include <stdio.h>
 #include "battery.h"
-#include "../assets/font.h"
 
 #define OFFSET_X 29
 #define OFFSET_Y 37
@@ -15,18 +15,22 @@ void draw_battery_status(lv_obj_t *canvas, const struct status_state *state) {
     lv_draw_rect_dsc_t rect_dsc;
     init_rect_dsc(&rect_dsc, LVGL_FOREGROUND);
     lv_draw_label_dsc_t outline_dsc;
-    init_label_dsc(&outline_dsc, LVGL_BACKGROUND, &font, LV_TEXT_ALIGN_CENTER);
+    init_label_dsc(&outline_dsc, LVGL_BACKGROUND, &lv_font_montserrat_10, LV_TEXT_ALIGN_CENTER);
     lv_draw_label_dsc_t label_dsc;
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &font, LV_TEXT_ALIGN_CENTER);
+    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_10, LV_TEXT_ALIGN_CENTER);
 
     lv_canvas_draw_img(canvas, 0, 0, &battery, &img_dsc);
     lv_canvas_draw_rect(canvas, 4, 4, 54 * state->battery / 100, 23, &rect_dsc);
     lv_canvas_draw_img(canvas, 2, 2, &battery_mask, &img_dsc);
 
-    char text[10] = {};
-    sprintf(text, "%i%%", state->battery);
+    char text[16];
+    if (state->right_battery <= 100) {
+        snprintf(text, sizeof(text), "(%u / %u)", state->battery, state->right_battery);
+    } else {
+        snprintf(text, sizeof(text), "(%u / --)", state->battery);
+    }
 
-    const int y = 9;
+    const int y = 11;
     const int w = 62;
 
     for (int dx = -1; dx <= 1; dx++) {

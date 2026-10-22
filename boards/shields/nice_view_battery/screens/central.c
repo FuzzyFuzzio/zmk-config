@@ -22,6 +22,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include "../widgets/profile.h"
 #include "../widgets/layer.h"
 
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_SYNC)
+#include <battery_sync.h>
+#endif
+
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
 // Draw
@@ -63,6 +67,7 @@ static void set_battery_status(struct zmk_widget_screen *widget,
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
 
     widget->state.battery = state.level;
+    widget->state.right_battery = state.right_level;
 
     draw_middle(widget->obj, widget->cbuf2, &widget->state);
 }
@@ -77,6 +82,11 @@ static struct battery_status_state battery_status_get_state(const zmk_event_t *e
 
     return (struct battery_status_state){
         .level = (ev != NULL) ? ev->state_of_charge : zmk_battery_state_of_charge(),
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_SYNC)
+        .right_level = zmk_battery_sync_get(),
+#else
+        .right_level = UINT8_MAX,
+#endif
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
         .usb_present = zmk_usb_is_powered(),
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
@@ -87,6 +97,9 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_battery_status, struct battery_status_state,
                             battery_status_update_cb, battery_status_get_state);
 
 ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
+#if IS_ENABLED(CONFIG_ZMK_BATTERY_SYNC)
+ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_sync_changed);
+#endif
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK)
 ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */

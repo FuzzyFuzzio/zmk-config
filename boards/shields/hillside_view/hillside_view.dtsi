@@ -7,6 +7,7 @@
 #include <dt-bindings/zmk/matrix_transform.h>
 #include <dt-bindings/led/led.h>
 #include <behaviors/layer_sync.dtsi>
+#include <behaviors/battery_sync.dtsi>
 
 / {
   chosen: chosen {
@@ -193,4 +194,3 @@ nice_view_spi: &spi1 {
     height = <68>;
   };
 };
-
