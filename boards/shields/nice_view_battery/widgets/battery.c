@@ -25,9 +25,9 @@ void draw_battery_status(lv_obj_t *canvas, const struct status_state *state) {
 
     char text[16];
     if (state->right_battery <= 100) {
-        snprintf(text, sizeof(text), "(%u / %u)", state->battery, state->right_battery);
+        snprintf(text, sizeof(text), "%u / %u", state->battery, state->right_battery);
     } else {
-        snprintf(text, sizeof(text), "(%u / --)", state->battery);
+        snprintf(text, sizeof(text), "%u / --", state->battery);
     }
 
     const int y = 11;

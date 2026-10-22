@@ -352,20 +352,20 @@ static void test_drawing(void) {
     lv_obj_t canvas = {0};
     struct status_state state = {.battery = 25, .right_battery = 18};
     draw_battery_status(&canvas, &state);
-    assert(strcmp(drawn_text, "(25 / 18)") == 0);
+    assert(strcmp(drawn_text, "25 / 18") == 0);
     assert(fill_width == 54 * 25 / 100 && bolt_count == 0);
     state.battery = 100;
     state.right_battery = 100;
     state.charging = true;
     draw_battery_status(&canvas, &state);
-    assert(strcmp(drawn_text, "(100 / 100)") == 0 && bolt_count == 1);
+    assert(strcmp(drawn_text, "100 / 100") == 0 && bolt_count == 1);
     state.battery = 0;
     state.right_battery = 0;
     draw_battery_status(&canvas, &state);
-    assert(strcmp(drawn_text, "(0 / 0)") == 0 && fill_width == 0);
+    assert(strcmp(drawn_text, "0 / 0") == 0 && fill_width == 0);
     state.right_battery = ZMK_BATTERY_SYNC_UNKNOWN;
     draw_battery_status(&canvas, &state);
-    assert(strcmp(drawn_text, "(0 / --)") == 0);
+    assert(strcmp(drawn_text, "0 / --") == 0);
 }
 
 int main(void) {

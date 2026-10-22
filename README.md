@@ -33,8 +33,8 @@ The ZMK v0.3 reusable build workflow detects this module automatically. For loca
 The right half has no display; its display stack and nice!view SPI bus are disabled.
 
 ### Battery display
-The left display shows `(left / right)` percentages inside the battery image, for example
-`(25 / 18)`. The fill level and lightning bolt still refer to the left half; the bolt
+The left display shows `left / right` percentages inside the battery image, for example
+`25 / 18`. The fill level and lightning bolt still refer to the left half; the bolt
 means USB power is present, not that the charger has confirmed current into the battery.
 `--` means the right reading is not available.
 
