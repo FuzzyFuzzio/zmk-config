@@ -37,11 +37,33 @@ jobs:
           repository: zmkfirmware/zmk
           ref: ${{ steps.cirque.outputs.zmk_revision }}
           path: .ci-zmk
+      - name: Read ZMK's Zephyr revision
+        id: zephyr
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import re
+          manifest = Path(".ci-zmk/app/west.yml").read_text()
+          project = manifest.split("- name: zephyr\n", 1)[1].split("\n    - name:", 1)[0]
+          revision = re.search(r"^\s+revision:\s*(\S+)\s*$", project, re.MULTILINE)
+          if revision is None or "remote: zmkfirmware" not in project:
+              raise ValueError("Cannot identify ZMK's pinned Zephyr source")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"revision={revision.group(1)}\n")
+      - uses: actions/checkout@v4
+        with:
+          repository: zmkfirmware/zephyr
+          ref: ${{ steps.zephyr.outputs.revision }}
+          path: .ci-zephyr
+          sparse-checkout: subsys/settings/src/settings.c
+          sparse-checkout-cone-mode: false
       - name: Run host fault and regression tests
         env:
           CC: gcc
           CIRQUE_MODULE_DIR: ${{ github.workspace }}/.ci-cirque
           ZMK_MODULE_DIR: ${{ github.workspace }}/.ci-zmk
+          ZEPHYR_MODULE_DIR: ${{ github.workspace }}/.ci-zephyr
         run: python -m unittest discover -s tests -v
 
   build:

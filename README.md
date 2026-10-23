@@ -141,6 +141,23 @@ a button-release snapshot. Zephyr's Bluetooth/input calls can still wait inside 
 dedicated delivery worker; queue/stale-motion diagnostics expose congestion without
 stalling unrelated system work.
 
+#### Bluetooth startup order
+
+Patched ZMK application sources must replace their original positions in the app
+source list, not be prepended during module configuration. Same-priority `SYS_INIT`
+entries follow object link order. In `383a171`, prepending the split central source
+made `zmk_split_bt_central_init()` run before `zmk_ble_init()` at application priority
+50. The split registered its dynamic settings handler, then `bt_enable()` initialized
+the settings subsystem and cleared that registration. The split's commit callback
+never ran, `settings_loaded` remained false, and the dongle never enabled scanning.
+This prevented both halves connecting even though compilation and unit tests passed.
+
+Source replacement is now deferred until ZMK has registered its application sources,
+then performed in place. [check_init_order.py](trackpad/check_init_order.py) checks
+the actual linked ELF startup entries after every affected firmware build. Centrals
+require core Bluetooth before split initialization; peripherals require their
+notification service before peripheral initialization (which enables Bluetooth).
+
 **Flash the updated central first, then the right half:** the dongle in dongle mode,
 or the left-central half in no-dongle mode. The left peripheral does not need flashing
 for these trackpad changes. An old central cannot decode the new right-half frames.
@@ -197,6 +214,13 @@ queue roles, exact 12-byte format, duplicate/wrapping/gapped sequences, the 49/5
 stale-motion boundary, backoff, overflow coalescing and retained button releases.
 [Split tests](tests/test_trackpad_split.py) compile the real patched ZMK proxy and
 listener functions and inject a failure between X and Y/sync to check clean replay.
+[Startup tests](tests/test_trackpad_init.py) exercise the real module CMake source
+registration and the real Zephyr settings initialization/registration functions,
+including the lost-handler failure from `383a171`. They require CMake, Ninja and
+the manifest-selected Zephyr checkout (`ZEPHYR_MODULE_DIR`; a sibling `zephyr`
+checkout is also detected). CI checks out the exact settings source and does not
+skip this regression. The firmware build additionally checks actual ELF ordering;
+host mocks alone cannot validate device startup order.
 
 For a right-half USB diagnostic build, use ZMK's existing `zmk-usb-logging` snippet
 (`west build -S zmk-usb-logging`) to supply the CDC UART devicetree node, and add
@@ -222,6 +246,11 @@ split forwarding without changing report delivery or dropping half of an X/Y pai
 - If all else fails, flash `settings_reset` to the halves and the dongle.
 
 ### Troubleshooting
+- Neither half connects to the dongle with `383a171`: update the dongle to the
+  startup-order fix, then power-cycle the halves. The failure was loss of the
+  split settings handler during boot, not evidence of corrupt bonds. Do not use
+  `settings_reset` for this regression. Halves already using the matching firmware
+  roles do not need reflashing to correct the dongle startup failure.
 - Host sees two keyboards: remove the old bond to a former central (e.g. the left half) from the OS Bluetooth settings.
 - No trackpad input: check that both halves show connected and that the `reg` values in the right and central overlays match.
 - Erratic paths or a freeze followed by a large jump: flash the patched right-half
