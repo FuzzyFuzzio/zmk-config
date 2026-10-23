@@ -97,6 +97,9 @@ config PERIPHERAL_BOOT_BONDCLEAR
       corners (top + bottom of the outermost column) for both
       easy recall and low false-trigger risk during normal typing.
 
+      A boot-window request waits for Bluetooth readiness and for
+      stored bond settings to finish loading before clearing bonds.
+
 if PERIPHERAL_BOOT_BONDCLEAR
 
 config PERIPHERAL_BOOT_BONDCLEAR_WINDOW_MS

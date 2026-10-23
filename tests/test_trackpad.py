@@ -473,6 +473,11 @@ static void test_power_and_init(void) {
 }
 static void test_faults_and_timeouts(void) {
     reset();
+    status = 0xff;
+    assert(pinnacle_wait(&dev, PINNACLE_STATUS1, PINNACLE_STATUS1_SW_CC,
+                         PINNACLE_STATUS1_SW_CC, 500) == -EIO);
+    assert(now_ms == 0 && errors == 1);
+    reset();
     era_busy = 1;
     uint8_t value;
     assert(pinnacle_era_read(&dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, &value) == -ETIMEDOUT);

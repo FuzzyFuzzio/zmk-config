@@ -128,14 +128,13 @@ static void request_unpair(struct peer_state *p, const char *why)
     LOG_WRN("%s with split peripheral %s - clearing bond to allow a fresh pairing",
             why, addr);
 
-    p->has_unpaired = true;
-    p->last_unpair_uptime = now;
-    p->unenc_disconnects = 0;
-
     if (k_msgq_put(&unpair_q, &p->addr, K_NO_WAIT) != 0) {
         LOG_ERR("Unpair queue full, dropping request for %s", addr);
         return;
     }
+    p->has_unpaired = true;
+    p->last_unpair_uptime = now;
+    p->unenc_disconnects = 0;
     k_work_submit(&unpair_work);
 }
 
@@ -185,7 +184,9 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
     /* With mismatched keys the half usually detects the MIC failure and drops
      * silently, so the dongle only sees e.g. a supervision timeout here.
      */
-    p->unenc_disconnects++;
+    if (p->unenc_disconnects < UINT8_MAX) {
+        p->unenc_disconnects++;
+    }
     LOG_WRN("Split peripheral disconnected before encrypting (reason 0x%02x), %d/%d",
             reason, p->unenc_disconnects, MAX_UNENC_DISCONNECTS);
 

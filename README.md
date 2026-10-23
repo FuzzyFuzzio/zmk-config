@@ -31,6 +31,10 @@ The ZMK v0.3 reusable build workflow detects this module automatically. For loca
 | Utility | Settings reset | `nice_nano_v2` / `nrf52840_mdk_usb_dongle` | `settings_reset` |
 
 The right half has no display; its display stack and nice!view SPI bus are disabled.
+Both matrix transforms retain the physical 12-column scan (six columns per half).
+The five-column layout only omits outer keys from its map; it does not shrink the
+scan width or remove the right half's six-column offset. The active six-column
+layout and key bindings are unchanged.
 
 ### Battery display
 The left display shows `left / right` percentages inside the battery image, for example
@@ -45,6 +49,8 @@ right half by its characteristic avoids relying on BLE pairing order. Battery te
 does not generate key or pointer activity and does not keep the keyboard awake.
 The right reading is cleared when its link to the central is lost, or when the left
 peripheral loses its link to the dongle.
+Reconnect-triggered relay resynchronization is not postponed by an already-running
+periodic cycle.
 
 Flash the new firmware to **both halves and the dongle** for dongle mode, or to **both
 halves** for no-dongle mode. Older right-half firmware will show `--` on the new display.
@@ -86,6 +92,8 @@ The fixes:
 - Bound extended-register polling to 100 ms and calibration/reset polling to 500 ms,
   sleeping between polls and propagating read errors. A poll deadline can overshoot
   by an in-flight bus transfer's own timeout; it is not a hard real-time guarantee.
+  Startup status `0xFF` is rejected as a communication failure, not mistaken for a
+  calibration-complete flag.
 - Check required writes/readbacks, bus/GPIO readiness, and GPIO/callback setup.
   Work/state are initialized before callbacks, interrupts remain disabled throughout
   setup, and the data feed is enabled last. Missing data-ready pins or out-of-byte-range
@@ -153,7 +161,9 @@ never ran, `settings_loaded` remained false, and the dongle never enabled scanni
 This prevented both halves connecting even though compilation and unit tests passed.
 
 Source replacement is now deferred until ZMK has registered its application sources,
-then performed in place. [check_init_order.py](trackpad/check_init_order.py) checks
+then performed in place. Driver library sources are also replaced in place so they
+retain their original device initialization order.
+[check_init_order.py](trackpad/check_init_order.py) checks
 the actual linked ELF startup entries after every affected firmware build. Centrals
 require core Bluetooth before split initialization; peripherals require their
 notification service before peripheral initialization (which enables Bluetooth).
@@ -221,6 +231,11 @@ the manifest-selected Zephyr checkout (`ZEPHYR_MODULE_DIR`; a sibling `zephyr`
 checkout is also detected). CI checks out the exact settings source and does not
 skip this regression. The firmware build additionally checks actual ELF ordering;
 host mocks alone cannot validate device startup order.
+[Hardware tests](tests/test_hardware_config.py) compile ZMK's actual transform
+function against both layout maps and every physical scan coordinate on each half;
+they also check editor/keymap counts and advertised firmware roles.
+[Recovery tests](tests/test_split_recovery.py) exercise boot/settings readiness,
+release/repress timer races, queue failure cooldowns and disconnect-count saturation.
 
 For a right-half USB diagnostic build, use ZMK's existing `zmk-usb-logging` snippet
 (`west build -S zmk-usb-logging`) to supply the CDC UART devicetree node, and add
@@ -243,6 +258,10 @@ split forwarding without changing report delivery or dropping half of an X/Y pai
 - **Peripheral halves (manual)**: hold the half's top and bottom outer-column keys while switching it on, or
   hold them for 5 s at any time, to wipe its bonds and re-pair
   ([peripheral_boot_bondclear.c](dongle_split_recovery/src/peripheral_boot_bondclear.c)).
+  Clearing waits for Bluetooth and persisted settings to be ready. A canceled hold
+  cannot shorten a subsequent hold's required duration.
+- Automatic recovery only starts its cooldown after an unpair request is queued;
+  a full queue does not silently suppress the next retry.
 - If all else fails, flash `settings_reset` to the halves and the dongle.
 
 ### Troubleshooting

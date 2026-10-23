@@ -41,9 +41,8 @@
  *     two outer-corner keys makes accidental triggers vanishingly
  *     unlikely.
  *
- *   - bt_unpair runs from a delayable work item so it isn't called
- *     inside the event-manager call stack and has time for the BT
- *     host to be ready.
+ *   - bt_unpair runs from a delayable work item outside the event-manager
+ *     call stack, after the BT host is ready and bond settings have loaded.
  */
 
 #define LOG_LEVEL CONFIG_PERIPHERAL_BOOT_BONDCLEAR_LOG_LEVEL
@@ -56,6 +55,10 @@ LOG_MODULE_REGISTER(peripheral_boot_bondclear);
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
 
+#if IS_ENABLED(CONFIG_SETTINGS)
+#include <zephyr/settings/settings.h>
+#endif
+
 #include <zmk/event_manager.h>
 #include <zmk/events/position_state_changed.h>
 
@@ -67,6 +70,8 @@ LOG_MODULE_REGISTER(peripheral_boot_bondclear);
 /* Live press state. Updated from the event-manager listener thread. */
 static atomic_t pos_a_down  = ATOMIC_INIT(0);
 static atomic_t pos_b_down  = ATOMIC_INIT(0);
+static K_MUTEX_DEFINE(combo_mutex);
+static int64_t panic_deadline;
 
 /* fired latches true the first time the unpair work has been scheduled,
  * so neither the boot path nor the panic-hold path can re-enter while
@@ -80,15 +85,37 @@ static atomic_t fired       = ATOMIC_INIT(0);
  */
 static atomic_t window_open = ATOMIC_INIT(1);
 
+static atomic_t settings_loaded = ATOMIC_INIT(!IS_ENABLED(CONFIG_SETTINGS));
+
+#if IS_ENABLED(CONFIG_SETTINGS)
+static int bondclear_settings_commit(void)
+{
+    atomic_set(&settings_loaded, 1);
+    return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(peripheral_bondclear, "peripheral_bondclear",
+                               NULL, NULL, bondclear_settings_commit, NULL);
+#endif
+
 static void disconnect_conn(struct bt_conn *conn, void *data)
 {
     ARG_UNUSED(data);
     bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 }
 
+static void do_unpair_work(struct k_work *w);
+static K_WORK_DELAYABLE_DEFINE(unpair_work, do_unpair_work);
+
 static void do_unpair_work(struct k_work *w)
 {
     ARG_UNUSED(w);
+    /* Early kscan events can arrive before main restores the stored bonds. */
+    if (!bt_is_ready() || !atomic_get(&settings_loaded)) {
+        k_work_reschedule(&unpair_work, K_MSEC(250));
+        return;
+    }
+
     LOG_WRN("Bond clear: wiping all stored BLE bonds");
     int err = bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY);
     if (err) {
@@ -102,7 +129,6 @@ static void do_unpair_work(struct k_work *w)
      */
     bt_conn_foreach(BT_CONN_TYPE_LE, disconnect_conn, NULL);
 }
-static K_WORK_DELAYABLE_DEFINE(unpair_work, do_unpair_work);
 
 static void schedule_unpair(const char *reason)
 {
@@ -121,14 +147,15 @@ static void schedule_unpair(const char *reason)
 static void panic_hold_work(struct k_work *w)
 {
     ARG_UNUSED(w);
-    /* Re-check live state; a release that races with the timer expiry
-     * should not trigger the unpair.
+    /* A canceled handler may already be running when the combo is
+     * released and pressed again. Only the current hold's deadline counts.
      */
-    if (!atomic_get(&pos_a_down) || !atomic_get(&pos_b_down)) {
-        LOG_DBG("Panic hold timer fired but combo no longer held");
-        return;
+    k_mutex_lock(&combo_mutex, K_FOREVER);
+    if (atomic_get(&pos_a_down) && atomic_get(&pos_b_down) &&
+        k_uptime_get() >= panic_deadline) {
+        schedule_unpair("Panic hold");
     }
-    schedule_unpair("Panic hold");
+    k_mutex_unlock(&combo_mutex);
 }
 static K_WORK_DELAYABLE_DEFINE(panic_work, panic_hold_work);
 
@@ -143,15 +170,16 @@ static K_WORK_DELAYABLE_DEFINE(close_window, close_window_work);
 
 static int position_listener(const zmk_event_t *eh)
 {
-    /* Once we've scheduled an unpair, ignore further events. */
-    if (atomic_get(&fired)) {
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-
     const struct zmk_position_state_changed *ev =
         as_zmk_position_state_changed(eh);
     if (ev == NULL) {
         return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    k_mutex_lock(&combo_mutex, K_FOREVER);
+    /* Once we've scheduled an unpair, ignore further events. */
+    if (atomic_get(&fired)) {
+        goto out;
     }
 
     /* Update press state for the two trigger keys. Any other position
@@ -159,6 +187,7 @@ static int position_listener(const zmk_event_t *eh)
      * an unrelated press, so the user typing while the host is dead
      * doesn't reset the hold-to-recover timer.
      */
+    bool were_both_down = atomic_get(&pos_a_down) && atomic_get(&pos_b_down);
     bool changed = false;
     if (ev->position == POS_A) {
         atomic_set(&pos_a_down, ev->state ? 1 : 0);
@@ -168,7 +197,7 @@ static int position_listener(const zmk_event_t *eh)
         changed = true;
     }
     if (!changed) {
-        return ZMK_EV_EVENT_BUBBLE;
+        goto out;
     }
 
     bool both_down = atomic_get(&pos_a_down) && atomic_get(&pos_b_down);
@@ -179,21 +208,23 @@ static int position_listener(const zmk_event_t *eh)
         k_work_cancel_delayable(&close_window);
         k_work_cancel_delayable(&panic_work);
         schedule_unpair("Boot bondclear");
-        return ZMK_EV_EVENT_BUBBLE;
+        goto out;
     }
 
     /* Outside the boot window: arm/disarm the panic-hold timer. */
     if (HOLD_MS > 0) {
-        if (both_down) {
-            /* Combo just achieved - start the hold timer if not running. */
-            k_work_schedule(&panic_work, K_MSEC(HOLD_MS));
+        if (both_down && !were_both_down) {
+            panic_deadline = k_uptime_get() + HOLD_MS;
+            k_work_reschedule(&panic_work, K_MSEC(HOLD_MS));
             LOG_DBG("Panic hold armed (release either key to cancel)");
-        } else {
+        } else if (!both_down) {
             /* Either key released - cancel any pending fire. */
             k_work_cancel_delayable(&panic_work);
         }
     }
 
+out:
+    k_mutex_unlock(&combo_mutex);
     return ZMK_EV_EVENT_BUBBLE;
 }
 

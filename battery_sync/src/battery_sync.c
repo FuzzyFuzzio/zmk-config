@@ -121,8 +121,9 @@ static void sync_connection(struct bt_conn *conn, void *data) {
 }
 
 static void sync_work_cb(struct k_work *work) {
+    /* Preserve a reconnect timer installed before this queued handler starts. */
+    k_work_schedule(&sync_work, POLL_INTERVAL);
     bt_conn_foreach(BT_CONN_TYPE_LE, sync_connection, NULL);
-    k_work_reschedule(&sync_work, POLL_INTERVAL);
 }
 
 static void update_right_level(uint8_t level) {

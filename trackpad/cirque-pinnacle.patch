@@ -1,5 +1,5 @@
 diff --git a/input_pinnacle.c b/input_pinnacle.c
-index d5c7416..77841e5 100644
+index d5c7416..2a6fd91 100644
 --- a/input_pinnacle.c
 +++ b/input_pinnacle.c
 @@ -11,6 +11,19 @@
@@ -65,7 +65,7 @@ index d5c7416..77841e5 100644
      }
  
      if (rx_buffer[1] != PINNACLE_FILLER) {
-@@ -130,177 +160,290 @@ static int pinnacle_clear_status(const struct device *dev) {
+@@ -130,177 +160,294 @@ static int pinnacle_clear_status(const struct device *dev) {
      if (ret < 0) {
          LOG_ERR("Failed to clear STATUS1 register: %d", ret);
      }
@@ -101,6 +101,10 @@ index d5c7416..77841e5 100644
 +        if (ret < 0) {
 +            LOG_ERR("Failed polling register %02x: %d", addr, ret);
 +            return ret;
++        }
++        if (addr == PINNACLE_STATUS1 && value == 0xff) {
++            LOG_ERR("Invalid STATUS1 value while polling");
++            return -EIO;
 +        }
 +        if ((value & mask) == expected) {
 +            return 0;
@@ -429,7 +433,7 @@ index d5c7416..77841e5 100644
  }
  
  static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitivity) {
-@@ -314,43 +457,36 @@ static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitiv
+@@ -314,43 +461,36 @@ static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitiv
      case PINNACLE_SENSITIVITY_4X:
          return PINNACLE_TRACKING_ADC_CONFIG_4X;
      default:
@@ -490,7 +494,7 @@ index d5c7416..77841e5 100644
  }
  
  static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
-@@ -360,21 +496,33 @@ static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
+@@ -360,21 +500,33 @@ static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
      int ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, &val);
      if (ret < 0) {
          LOG_ERR("Failed to get ADC sensitivity %d", ret);
@@ -527,7 +531,7 @@ index d5c7416..77841e5 100644
  }
  
  static int pinnacle_force_recalibrate(const struct device *dev) {
-@@ -382,22 +530,20 @@ static int pinnacle_force_recalibrate(const struct device *dev) {
+@@ -382,22 +534,20 @@ static int pinnacle_force_recalibrate(const struct device *dev) {
      int ret = pinnacle_seq_read(dev, PINNACLE_CAL_CFG, &val, 1);
      if (ret < 0) {
          LOG_ERR("Failed to get cal config %d", ret);
@@ -554,7 +558,7 @@ index d5c7416..77841e5 100644
      uint8_t sys_cfg;
      int ret = pinnacle_seq_read(dev, PINNACLE_SYS_CFG, &sys_cfg, 1);
      if (ret < 0) {
-@@ -421,137 +567,162 @@ int pinnacle_set_sleep(const struct device *dev, bool enabled) {
+@@ -421,137 +571,162 @@ int pinnacle_set_sleep(const struct device *dev, bool enabled) {
      return ret;
  }
  
@@ -797,7 +801,7 @@ index d5c7416..77841e5 100644
      default:
          return -ENOTSUP;
      }
-@@ -560,16 +731,22 @@ static int pinnacle_pm_action(const struct device *dev, enum pm_device_action ac
+@@ -560,16 +735,22 @@ static int pinnacle_pm_action(const struct device *dev, enum pm_device_action ac
  #endif // IS_ENABLED(CONFIG_PM_DEVICE)
  
  #define PINNACLE_INST(n)                                                                           \

@@ -98,6 +98,31 @@ endfunction()
 cmake_language(DEFER CALL check_source_order)
 """
 
+DRIVER_CMAKE = r"""
+cmake_minimum_required(VERSION 3.20)
+project(trackpad_driver_order NONE)
+set(CONFIG_INPUT_PINNACLE TRUE)
+set(CONFIG_ZMK_TRACKPAD_RELIABLE_SPLIT FALSE)
+file(TO_CMAKE_PATH [[@ROOT@]] repository)
+file(TO_CMAKE_PATH [[@CIRQUE@]] ZEPHYR_CIRQUE_INPUT_MODULE_MODULE_DIR)
+add_custom_target(drivers__input)
+target_sources(drivers__input PRIVATE before.c
+  "${ZEPHYR_CIRQUE_INPUT_MODULE_MODULE_DIR}/drivers/input/input_pinnacle.c" after.c)
+add_subdirectory("${repository}/trackpad" "${CMAKE_BINARY_DIR}/trackpad")
+get_target_property(sources drivers__input SOURCES)
+set(actual)
+foreach(source IN LISTS sources)
+  get_filename_component(absolute "${source}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+  list(APPEND actual "${absolute}")
+endforeach()
+set(expected "${CMAKE_CURRENT_SOURCE_DIR}/before.c"
+             "${CMAKE_BINARY_DIR}/trackpad/driver/input_pinnacle.c"
+             "${CMAKE_CURRENT_SOURCE_DIR}/after.c")
+if(NOT "${actual}" STREQUAL "${expected}")
+  message(FATAL_ERROR "Patched driver changed original library source order: ${actual}")
+endif()
+"""
+
 SETTINGS_STUB = r"""
 #include <assert.h>
 #include <stdbool.h>
@@ -170,6 +195,21 @@ int main(void) {
 
 
 class TrackpadInitTests(unittest.TestCase):
+    def test_driver_library_source_order(self):
+        module = os.environ.get("CIRQUE_MODULE_DIR")
+        self.assertTrue(module, "Set CIRQUE_MODULE_DIR to the pinned Cirque checkout")
+        with tempfile.TemporaryDirectory(prefix="zmk-driver-order-") as directory:
+            temp = Path(directory)
+            cmake = DRIVER_CMAKE.replace("@ROOT@", str(ROOT)).replace("@CIRQUE@", module)
+            (temp / "CMakeLists.txt").write_text(cmake, encoding="ascii")
+            (temp / "before.c").write_text("", encoding="ascii")
+            (temp / "after.c").write_text("", encoding="ascii")
+            result = subprocess.run(
+                ["cmake", "-G", "Ninja", "-S", str(temp), "-B", str(temp / "build")],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_elf_order_guard(self):
         for split, before in init_check.PREDECESSORS.items():
             with self.subTest(split=split):

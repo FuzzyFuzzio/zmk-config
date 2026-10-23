@@ -71,6 +71,7 @@ struct behavior_driver_api {
     static const void *used_api __attribute__((used)) = api
 static uint8_t mirrored_level;
 static int mirror_count, mirror_error;
+static void (*during_mirror)(void);
 static int zmk_split_central_invoke_behavior(uint8_t source, struct zmk_behavior_binding *binding,
                                            struct zmk_behavior_binding_event event, bool pressed) {
     assert(strcmp(binding->behavior_dev, "bat_sync") == 0);
@@ -78,6 +79,11 @@ static int zmk_split_central_invoke_behavior(uint8_t source, struct zmk_behavior
     assert(pressed);
     mirrored_level = binding->param1;
     mirror_count++;
+    if (during_mirror) {
+        void (*hook)(void) = during_mirror;
+        during_mirror = NULL;
+        hook();
+    }
     return mirror_error;
 }
 
@@ -86,6 +92,10 @@ struct k_work_delayable { struct k_work work; void (*fn)(struct k_work *); int d
 #define K_WORK_DELAYABLE_DEFINE(name, fn) struct k_work_delayable name = {{0}, fn, -1}
 static int k_work_reschedule(struct k_work_delayable *work, int delay) {
     work->delay = delay; return 0;
+}
+static int k_work_schedule(struct k_work_delayable *work, int delay) {
+    if (work->delay >= 0) { return 0; }
+    work->delay = delay; return 1;
 }
 static int64_t k_uptime_get(void) { return 123; }
 typedef int atomic_t;
@@ -220,10 +230,17 @@ static void reset(void) {
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
     memset(reads, 0, sizeof(reads));
     right_conn = NULL;
+    sync_work.delay = poll_work.delay = -1;
+    during_mirror = NULL;
 #endif
 }
 
 #if IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
+static void run_sync_work(void) {
+    /* Consume the submission's deadline before entering its handler. */
+    sync_work.delay = -1;
+    sync_work_cb(NULL);
+}
 static void connect_half(int i) {
     conns[i].state = BT_CONN_STATE_CONNECTED;
     connected(&conns[i], 0);
@@ -251,7 +268,7 @@ static void test_mode(int left_index, int right_index) {
     uint8_t level = 18;
     complete(right_index, 0, &level, 1);
     assert(zmk_battery_sync_get() == 18 && event_count == 1);
-    sync_work_cb(NULL);
+    run_sync_work();
     assert(mirrored_level == 18 && mirror_count == (left_index >= 0 ? 2 : 1));
     assert(sync_work.delay == POLL_INTERVAL);
     poll_work_cb(NULL);
@@ -313,8 +330,34 @@ static void test_central_failures(void) {
     assert(request_count == 0);
     conns[0].role = BT_CONN_ROLE_CENTRAL;
     mirror_error = -5;
-    sync_work_cb(NULL);
+    run_sync_work();
     assert(warnings == 1);
+}
+
+static void connect_during_mirror(void) { connect_half(1); }
+
+static void test_connect_during_sync(void) {
+    reset();
+    connect_half(0);
+    during_mirror = connect_during_mirror;
+    run_sync_work();
+    /* A new connection still needs its post-discovery resync, even if
+     * the periodic worker was already running when connected fired. */
+    assert(sync_work.delay == RETRY_DELAY);
+}
+
+static void test_connect_before_sync_handler(void) {
+    reset();
+    connect_half(0);
+    /* The periodic timeout expires and submits work, but the system
+     * workqueue has not entered its handler yet. */
+    sync_work.delay = -1;
+    connect_half(1);
+    assert(sync_work.delay == RETRY_DELAY);
+    /* Starting the already-submitted handler does not consume the NEW
+     * timer installed by connected(). Reschedule cannot unsubmit work. */
+    sync_work_cb(NULL);
+    assert(sync_work.delay == RETRY_DELAY);
 }
 #endif
 
@@ -376,6 +419,8 @@ int main(void) {
     test_mode(1, 0);
     test_mode(-1, 0);
     test_central_failures();
+    test_connect_during_sync();
+    test_connect_before_sync_handler();
 #elif IS_ENABLED(CONFIG_SHIELD_HILLSIDE_VIEW_RIGHT)
     reset();
     uint8_t value = 255;
@@ -418,7 +463,7 @@ class BatterySyncTests(unittest.TestCase):
         else:
             compiler = [sys.executable, "-m", "ziglang", "cc"]
 
-        with tempfile.TemporaryDirectory(prefix="zmk-battery-tests-") as directory:
+        with tempfile.TemporaryDirectory(prefix="zmk-battery-tests-", dir=ROOT) as directory:
             temp = Path(directory)
             stub = temp / "stubs.h"
             stub.write_text(STUB, encoding="ascii")
