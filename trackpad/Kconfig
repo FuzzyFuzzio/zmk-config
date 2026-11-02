@@ -1,3 +1,13 @@
+config ZMK_TRACKPAD_IDLE_SLEEP
+    bool "Cirque sleep while ZMK is idle"
+    depends on INPUT_PINNACLE && ZMK_POINTING
+    depends on !ZMK_INPUT_PINNACLE_IDLE_SLEEPER
+    help
+      Apply verified sleep changes on the sensor worker, retry I/O failures, and
+      reinitialize the sensor on activity or device resume after sleep. Wake
+      includes calibration; keep the pad untouched during this transition.
+      Do not combine with the upstream idle sleeper or devicetree sleep property.
+
 config ZMK_TRACKPAD_RELIABLE_SPLIT
     bool "Complete-frame trackpad split delivery"
     default y if SHIELD_HILLSIDE_VIEW_RIGHT || SHIELD_HILLSIDE_VIEW_LEFT_CENTRAL || SHIELD_KEYBOARD_DONGLE

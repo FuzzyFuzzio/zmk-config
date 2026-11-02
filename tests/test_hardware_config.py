@@ -30,6 +30,28 @@ def transform_definitions():
 
 
 class HardwareConfigTests(unittest.TestCase):
+    def test_right_trackpad_uses_local_idle_sleep_with_production_timeouts(self):
+        shield = ROOT / "boards" / "shields" / "hillside_view"
+        right = (shield / "hillside_view_right.conf").read_text()
+        self.assertRegex(right, r"(?m)^CONFIG_ZMK_TRACKPAD_IDLE_SLEEP=y$")
+        self.assertRegex(right, r"(?m)^CONFIG_ZMK_INPUT_PINNACLE_IDLE_SLEEPER=n$")
+        shared = (ROOT / "config" / "hillside_view.conf").read_text()
+        self.assertRegex(shared, r"(?m)^CONFIG_ZMK_SLEEP=y$")
+        self.assertNotRegex(right, r"(?m)^CONFIG_ZMK_SLEEP=n$")
+        for option, value in (("ZMK_IDLE_TIMEOUT", 1800000),
+                              ("ZMK_IDLE_SLEEP_TIMEOUT", 7200000)):
+            self.assertRegex(shared, rf"(?m)^CONFIG_{option}={value}$")
+            override = re.search(rf"(?m)^CONFIG_{option}=(\d+)$", right)
+            if override:
+                self.assertEqual(int(override.group(1)), value)
+        for source in (
+            (shield / "hillside_view.dtsi").read_text(),
+            (shield / "hillside_view_right.overlay").read_text(),
+        ):
+            node = re.search(r"glidepoint0:\s*glidepoint@2a\s*\{(.*?)\};", source, re.S)
+            self.assertIsNotNone(node)
+            self.assertNotRegex(node.group(1), r"(?m)^\s*sleep\s*;")
+
     def test_all_firmware_roles_are_exposed_in_metadata(self):
         source = (
             ROOT / "boards" / "shields" / "hillside_view" / "hillside_view.zmk.yml"

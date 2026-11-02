@@ -1,11 +1,13 @@
 diff --git a/input_pinnacle.c b/input_pinnacle.c
-index d5c7416..2a6fd91 100644
+index d5c7416..3430a56 100644
 --- a/input_pinnacle.c
 +++ b/input_pinnacle.c
-@@ -11,6 +11,19 @@
+@@ -11,6 +11,21 @@
  
  LOG_MODULE_REGISTER(pinnacle, CONFIG_INPUT_LOG_LEVEL);
  
++static int pinnacle_set_sleep_locked(const struct device *dev, bool enabled);
++
 +static uint8_t pinnacle_feed_cfg1(const struct pinnacle_config *config) {
 +    return PINNACLE_FEED_CFG1_EN_FEED |
 +           (config->x_invert ? PINNACLE_FEED_CFG1_INV_X : 0) |
@@ -22,7 +24,7 @@ index d5c7416..2a6fd91 100644
  static int pinnacle_seq_read(const struct device *dev, const uint8_t addr, uint8_t *buf,
                               const uint8_t len) {
      const struct pinnacle_config *config = dev->config;
-@@ -23,10 +36,21 @@ static int pinnacle_write(const struct device *dev, const uint8_t addr, const ui
+@@ -23,10 +38,21 @@ static int pinnacle_write(const struct device *dev, const uint8_t addr, const ui
  
  #if DT_ANY_INST_ON_BUS_STATUS_OKAY(i2c)
  
@@ -45,7 +47,7 @@ index d5c7416..2a6fd91 100644
  }
  
  static int pinnacle_i2c_write(const struct device *dev, const uint8_t addr, const uint8_t val) {
-@@ -38,6 +62,11 @@ static int pinnacle_i2c_write(const struct device *dev, const uint8_t addr, cons
+@@ -38,6 +64,11 @@ static int pinnacle_i2c_write(const struct device *dev, const uint8_t addr, cons
  
  #if DT_ANY_INST_ON_BUS_STATUS_OKAY(spi)
  
@@ -57,7 +59,7 @@ index d5c7416..2a6fd91 100644
  static int pinnacle_spi_seq_read(const struct device *dev, const uint8_t addr, uint8_t *buf,
                                   const uint8_t len) {
      const struct pinnacle_config *config = dev->config;
-@@ -101,6 +130,7 @@ static int pinnacle_spi_write(const struct device *dev, const uint8_t addr, cons
+@@ -101,6 +132,7 @@ static int pinnacle_spi_write(const struct device *dev, const uint8_t addr, cons
  
      if (ret < 0) {
          LOG_ERR("spi ret: %d", ret);
@@ -65,7 +67,7 @@ index d5c7416..2a6fd91 100644
      }
  
      if (rx_buffer[1] != PINNACLE_FILLER) {
-@@ -130,177 +160,294 @@ static int pinnacle_clear_status(const struct device *dev) {
+@@ -130,177 +162,310 @@ static int pinnacle_clear_status(const struct device *dev) {
      if (ret < 0) {
          LOG_ERR("Failed to clear STATUS1 register: %d", ret);
      }
@@ -228,7 +230,7 @@ index d5c7416..2a6fd91 100644
  
 -static void pinnacle_report_data(const struct device *dev) {
 +static int pinnacle_emit_data(const struct device *dev, int16_t dx, int16_t dy, uint8_t btn) {
-     const struct pinnacle_config *config = dev->config;
++    const struct pinnacle_config *config = dev->config;
 +    struct pinnacle_data *data = dev->data;
 +#if defined(CONFIG_LOG)
 +    int64_t queued_at = k_uptime_get();
@@ -265,7 +267,7 @@ index d5c7416..2a6fd91 100644
 +}
 +
 +static int pinnacle_report_data(const struct device *dev) {
-+    const struct pinnacle_config *config = dev->config;
+     const struct pinnacle_config *config = dev->config;
 +    struct pinnacle_data *data = dev->data;
      uint8_t packet[3];
      int ret;
@@ -376,8 +378,14 @@ index d5c7416..2a6fd91 100644
 -                input_report_key(dev, INPUT_BTN_0 + i, btn_val ? 1 : 0, false, K_FOREVER);
 -            }
 -        }
--    }
-+    return pinnacle_emit_data(dev, dx, dy, btn);
++    ret = pinnacle_emit_data(dev, dx, dy, btn);
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    if (ret >= 0 && data->wake_report_pending) {
++        data->wake_report_pending = false;
++        LOG_INF("Pinnacle first post-wake input: x=%d y=%d buttons=0x%02x", dx, dy, btn);
+     }
++#endif
++    return ret;
 +}
  
 -    data->btn_cache = btn;
@@ -399,7 +407,16 @@ index d5c7416..2a6fd91 100644
 +        k_mutex_unlock(&data->lock);
 +        return;
 +    }
-+    int ret = pinnacle_report_data(data->dev);
++    int ret = 0;
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    bool sleep = atomic_get(&data->sleep_requested);
++    if (!data->sleep_valid || sleep != data->sleep_enabled) {
++        ret = pinnacle_set_sleep_locked(data->dev, sleep);
++    }
++#endif
++    if (ret >= 0) {
++        ret = pinnacle_report_data(data->dev);
++    }
 +    int ready = gpio_pin_get_dt(&config->dr);
 +    k_mutex_unlock(&data->lock);
 +    if (ready < 0) {
@@ -433,7 +450,7 @@ index d5c7416..2a6fd91 100644
  }
  
  static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitivity) {
-@@ -314,43 +461,36 @@ static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitiv
+@@ -314,43 +479,36 @@ static int pinnacle_adc_sensitivity_reg_value(enum pinnacle_sensitivity sensitiv
      case PINNACLE_SENSITIVITY_4X:
          return PINNACLE_TRACKING_ADC_CONFIG_4X;
      default:
@@ -494,7 +511,7 @@ index d5c7416..2a6fd91 100644
  }
  
  static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
-@@ -360,21 +500,33 @@ static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
+@@ -360,21 +518,33 @@ static int pinnacle_set_adc_tracking_sensitivity(const struct device *dev) {
      int ret = pinnacle_era_read(dev, PINNACLE_ERA_REG_TRACKING_ADC_CONFIG, &val);
      if (ret < 0) {
          LOG_ERR("Failed to get ADC sensitivity %d", ret);
@@ -531,7 +548,7 @@ index d5c7416..2a6fd91 100644
  }
  
  static int pinnacle_force_recalibrate(const struct device *dev) {
-@@ -382,22 +534,20 @@ static int pinnacle_force_recalibrate(const struct device *dev) {
+@@ -382,176 +552,288 @@ static int pinnacle_force_recalibrate(const struct device *dev) {
      int ret = pinnacle_seq_read(dev, PINNACLE_CAL_CFG, &val, 1);
      if (ret < 0) {
          LOG_ERR("Failed to get cal config %d", ret);
@@ -554,41 +571,46 @@ index d5c7416..2a6fd91 100644
  }
  
 -int pinnacle_set_sleep(const struct device *dev, bool enabled) {
-+static int pinnacle_set_sleep_locked(const struct device *dev, bool enabled) {
-     uint8_t sys_cfg;
-     int ret = pinnacle_seq_read(dev, PINNACLE_SYS_CFG, &sys_cfg, 1);
+-    uint8_t sys_cfg;
+-    int ret = pinnacle_seq_read(dev, PINNACLE_SYS_CFG, &sys_cfg, 1);
++static int pinnacle_configure(const struct device *dev) {
++    const struct pinnacle_config *config = dev->config;
++    int ret = pinnacle_write(dev, PINNACLE_SYS_CFG, PINNACLE_SYS_CFG_RESET);
      if (ret < 0) {
-@@ -421,137 +571,162 @@ int pinnacle_set_sleep(const struct device *dev, bool enabled) {
-     return ret;
- }
- 
-+int pinnacle_set_sleep(const struct device *dev, bool enabled) {
-+    struct pinnacle_data *data = dev->data;
-+    k_mutex_lock(&data->lock, K_FOREVER);
-+    int ret = pinnacle_set_sleep_locked(dev, enabled);
-+    k_mutex_unlock(&data->lock);
-+    return ret;
-+}
-+
- static int pinnacle_init(const struct device *dev) {
-     struct pinnacle_data *data = dev->data;
-     const struct pinnacle_config *config = dev->config;
-     int ret;
- 
+-        LOG_ERR("can't read sys config %d", ret);
++        LOG_ERR("Failed to reset Pinnacle: %d", ret);
+         return ret;
+     }
+-
+-    if (((sys_cfg & PINNACLE_SYS_CFG_EN_SLEEP) != 0) == enabled) {
+-        return 0;
+-    }
+-
+-    LOG_DBG("Setting sleep: %s", (enabled ? "on" : "off"));
+-    WRITE_BIT(sys_cfg, PINNACLE_SYS_CFG_EN_SLEEP_BIT, enabled ? 1 : 0);
+-
+-    ret = pinnacle_write(dev, PINNACLE_SYS_CFG, sys_cfg);
++    k_msleep(20);
++    ret = pinnacle_wait(dev, PINNACLE_STATUS1, PINNACLE_STATUS1_SW_CC,
++                        PINNACLE_STATUS1_SW_CC, 500);
+     if (ret < 0) {
+-        LOG_ERR("can't write sleep config %d", ret);
+         return ret;
+     }
+-
+-    return ret;
+-}
+-
+-static int pinnacle_init(const struct device *dev) {
+-    struct pinnacle_data *data = dev->data;
+-    const struct pinnacle_config *config = dev->config;
+-    int ret;
+-
 -    uint8_t fw_id[2];
 -    ret = pinnacle_seq_read(dev, PINNACLE_FW_ID, fw_id, 2);
-+    data->dev = dev;
-+    atomic_set(&data->suspended, 1);
-+    k_mutex_init(&data->lock);
-+    k_work_init_delayable(&data->work, pinnacle_work_cb);
-+    if (!config->is_ready(dev) || !device_is_ready(config->dr.port)) {
-+        LOG_ERR("Pinnacle bus or data-ready GPIO is not ready");
-+        return -ENODEV;
-+    }
-+    ret = gpio_pin_configure_dt(&config->dr, GPIO_INPUT);
++    ret = pinnacle_clear_status(dev);
      if (ret < 0) {
 -        LOG_ERR("Failed to get the FW ID %d", ret);
-+        LOG_ERR("Failed to configure data-ready GPIO: %d", ret);
 +        return ret;
      }
 -
@@ -597,137 +619,238 @@ index d5c7416..2a6fd91 100644
 -    data->in_int = false;
 -    k_msleep(10);
 -    ret = pinnacle_write(dev, PINNACLE_STATUS1, 0); // Clear CC
-+    ret = set_int(dev, false);
++    uint8_t fw_id[2];
++    ret = pinnacle_seq_read(dev, PINNACLE_FW_ID, fw_id, sizeof(fw_id));
+     if (ret < 0) {
+-        LOG_ERR("can't write %d", ret);
++        LOG_ERR("Failed to read Pinnacle firmware ID: %d", ret);
+         return ret;
+     }
+-    k_usleep(50);
+-    ret = pinnacle_write(dev, PINNACLE_SYS_CFG, PINNACLE_SYS_CFG_RESET);
++    if (fw_id[0] == 0xff || fw_id[1] == 0xff) {
++        LOG_ERR("Invalid Pinnacle firmware ID");
++        return -EIO;
++    }
++    ret = pinnacle_write_checked(dev, PINNACLE_SYS_CFG,
++                                 config->sleep_en ? PINNACLE_SYS_CFG_EN_SLEEP : 0);
+     if (ret < 0) {
+-        LOG_ERR("can't reset %d", ret);
+         return ret;
+     }
+-    k_msleep(20);
+-    ret = pinnacle_write(dev, PINNACLE_Z_IDLE, 0x05); // No Z-Idle packets
++    ret = pinnacle_write_checked(dev, PINNACLE_Z_IDLE, 5);
      if (ret < 0) {
 -        LOG_ERR("can't write %d", ret);
          return ret;
      }
--    k_usleep(50);
-     ret = pinnacle_write(dev, PINNACLE_SYS_CFG, PINNACLE_SYS_CFG_RESET);
-     if (ret < 0) {
--        LOG_ERR("can't reset %d", ret);
--        return ret;
-+        LOG_ERR("Failed to reset Pinnacle: %d", ret);
-+        goto fail;
-     }
-     k_msleep(20);
--    ret = pinnacle_write(dev, PINNACLE_Z_IDLE, 0x05); // No Z-Idle packets
-+    ret = pinnacle_wait(dev, PINNACLE_STATUS1, PINNACLE_STATUS1_SW_CC,
-+                        PINNACLE_STATUS1_SW_CC, 500);
-     if (ret < 0) {
--        LOG_ERR("can't write %d", ret);
--        return ret;
-+        goto fail;
-+    }
-+    ret = pinnacle_clear_status(dev);
-+    if (ret < 0) {
-+        goto fail;
-+    }
-+    uint8_t fw_id[2];
-+    ret = pinnacle_seq_read(dev, PINNACLE_FW_ID, fw_id, sizeof(fw_id));
-+    if (ret < 0) {
-+        LOG_ERR("Failed to read Pinnacle firmware ID: %d", ret);
-+        goto fail;
-+    }
-+    if (fw_id[0] == 0xff || fw_id[1] == 0xff) {
-+        LOG_ERR("Invalid Pinnacle firmware ID");
-+        ret = -EIO;
-+        goto fail;
-+    }
-+    ret = pinnacle_write_checked(dev, PINNACLE_SYS_CFG,
-+                                 config->sleep_en ? PINNACLE_SYS_CFG_EN_SLEEP : 0);
-+    if (ret < 0) {
-+        goto fail;
-+    }
-+    ret = pinnacle_write_checked(dev, PINNACLE_Z_IDLE, 5);
-+    if (ret < 0) {
-+        goto fail;
-     }
- 
+-
      ret = pinnacle_set_adc_tracking_sensitivity(dev);
      if (ret < 0) {
-         LOG_ERR("Failed to set ADC sensitivity %d", ret);
--        return ret;
-+        goto fail;
+-        LOG_ERR("Failed to set ADC sensitivity %d", ret);
+         return ret;
      }
- 
+-
      ret = pinnacle_tune_edge_sensitivity(dev);
      if (ret < 0) {
-         LOG_ERR("Failed to tune edge sensitivity %d", ret);
--        return ret;
-+        goto fail;
+-        LOG_ERR("Failed to tune edge sensitivity %d", ret);
+         return ret;
      }
      ret = pinnacle_force_recalibrate(dev);
      if (ret < 0) {
-         LOG_ERR("Failed to force recalibration %d", ret);
--        return ret;
--    }
--
+-        LOG_ERR("Failed to force recalibration %d", ret);
+         return ret;
+     }
++    ret = pinnacle_write_checked(dev, PINNACLE_SLEEP_INTERVAL, 255);
++    if (ret < 0) {
++        return ret;
++    }
++    ret = pinnacle_write_checked(dev, PINNACLE_FEED_CFG2, pinnacle_feed_cfg2(config));
++    if (ret < 0) {
++        return ret;
++    }
++    return pinnacle_clear_status(dev);
++}
+ 
 -    if (config->sleep_en) {
 -        ret = pinnacle_set_sleep(dev, true);
--        if (ret < 0) {
--            return ret;
--        }
-+        goto fail;
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++static int pinnacle_recover_wake(const struct device *dev) {
++    struct pinnacle_data *data = dev->data;
++    const struct pinnacle_config *config = dev->config;
++    int ret = pinnacle_configure(dev);
++    if (ret < 0) {
++        return ret;
++    }
++    ret = pinnacle_write_checked(dev, PINNACLE_FEED_CFG1, pinnacle_feed_cfg1(config));
++    if (ret < 0) {
++        return ret;
++    }
++    if (data->btn_cache) {
++        ret = pinnacle_emit_data(dev, 0, 0, 0);
+         if (ret < 0) {
+             return ret;
+         }
      }
++    data->sleep_enabled = false;
++    data->sleep_valid = true;
++    data->wake_needed = false;
++    data->wake_started = false;
++    data->wake_report_pending = true;
++    LOG_INF("Pinnacle wake recovery complete (sensor reinitialized)");
++    return 0;
++}
++#endif
  
 -    uint8_t packet[1];
 -    ret = pinnacle_seq_read(dev, PINNACLE_SLEEP_INTERVAL, packet, 1);
 -
 -    if (ret >= 0) {
 -        LOG_DBG("Default sleep interval %d", packet[0]);
--    }
++static int pinnacle_set_sleep_locked(const struct device *dev, bool enabled) {
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    struct pinnacle_data *data = dev->data;
++    if (data->wake_started) {
++        int ret = pinnacle_recover_wake(dev);
++        if (ret < 0 || !enabled) {
++            return ret;
++        }
+     }
 -
 -    ret = pinnacle_write(dev, PINNACLE_SLEEP_INTERVAL, 255);
 -    if (ret <= 0) {
 -        LOG_DBG("Failed to update sleep interaval %d", ret);
--    }
++    /* A failed verification can leave hardware changed despite an old cached state. */
++    data->sleep_valid = false;
++    if (enabled) {
++        data->wake_needed = true;
+     }
 -
 -    uint8_t feed_cfg2 = PINNACLE_FEED_CFG2_EN_IM | PINNACLE_FEED_CFG2_EN_BTN_SCRL;
 -    if (config->no_taps) {
 -        feed_cfg2 |= PINNACLE_FEED_CFG2_DIS_TAP;
--    }
--
++#endif
++    uint8_t sys_cfg;
++    int ret = pinnacle_seq_read(dev, PINNACLE_SYS_CFG, &sys_cfg, 1);
++    if (ret < 0) {
++        LOG_ERR("can't read sys config %d", ret);
++        return ret;
+     }
+ 
 -    if (config->no_secondary_tap) {
 -        feed_cfg2 |= PINNACLE_FEED_CFG2_DIS_SEC;
--    }
--
++    if (sys_cfg == 0xff || (sys_cfg & (PINNACLE_SYS_CFG_RESET | PINNACLE_SYS_CFG_SHUTDOWN))) {
++        LOG_ERR("Invalid sys config while changing sleep: %02x", sys_cfg);
++        return -EIO;
+     }
+ 
 -    if (config->rotate_90) {
 -        feed_cfg2 |= PINNACLE_FEED_CFG2_ROTATE_90;
--    }
++    uint8_t target = sys_cfg;
++    WRITE_BIT(target, PINNACLE_SYS_CFG_EN_SLEEP_BIT, enabled ? 1 : 0);
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    if (!enabled && (data->wake_needed || (sys_cfg & PINNACLE_SYS_CFG_EN_SLEEP))) {
++        /* Deep-sleep boot already recovers this sensor with a software reset.
++         * Reuse that setup rather than the failed force-wake/toggle sequence.
++         */
++        data->wake_started = true;
++        return pinnacle_recover_wake(dev);
+     }
 -    ret = pinnacle_write(dev, PINNACLE_FEED_CFG2, feed_cfg2);
-+    ret = pinnacle_write_checked(dev, PINNACLE_SLEEP_INTERVAL, 255);
-     if (ret < 0) {
+-    if (ret < 0) {
 -        LOG_ERR("can't write %d", ret);
 -        return ret;
--    }
++#endif
++    if (sys_cfg != target) {
++        ret = pinnacle_write_checked(dev, PINNACLE_SYS_CFG, target);
++        if (ret < 0) {
++            return ret;
++        }
++        LOG_INF("Pinnacle %s verified, SysConfig1=0x%02x",
++                enabled ? "idle sleep" : "wake", target);
+     }
 -    uint8_t feed_cfg1 = PINNACLE_FEED_CFG1_EN_FEED;
 -    if (config->x_invert) {
 -        feed_cfg1 |= PINNACLE_FEED_CFG1_INV_X;
-+        goto fail;
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    data->sleep_enabled = enabled;
++    data->sleep_valid = true;
++    if (!enabled) {
++        data->wake_needed = false;
++        data->wake_started = false;
      }
--
++#endif
++    return 0;
++}
+ 
 -    if (config->y_invert) {
 -        feed_cfg1 |= PINNACLE_FEED_CFG1_INV_Y;
 -    }
 -    if (feed_cfg1) {
 -        ret = pinnacle_write(dev, PINNACLE_FEED_CFG1, feed_cfg1);
-+    ret = pinnacle_write_checked(dev, PINNACLE_FEED_CFG2, pinnacle_feed_cfg2(config));
-+    if (ret < 0) {
-+        goto fail;
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++int pinnacle_request_sleep(const struct device *dev, bool enabled) {
++    struct pinnacle_data *data = dev->data;
++    atomic_set(&data->sleep_requested, enabled);
++    if (atomic_get(&data->suspended)) {
++        return 0;
      }
-+    ret = pinnacle_clear_status(dev);
++    int ret = k_work_reschedule_for_queue(&data->work_q, &data->work, K_NO_WAIT);
      if (ret < 0) {
 -        LOG_ERR("can't write %d", ret);
--        return ret;
-+        goto fail;
++        LOG_ERR("Failed to queue Pinnacle sleep change: %d", ret);
+         return ret;
      }
--
++    return 0;
++}
++#endif
+ 
 -    data->dev = dev;
--
++int pinnacle_set_sleep(const struct device *dev, bool enabled) {
++    struct pinnacle_data *data = dev->data;
++    k_mutex_lock(&data->lock, K_FOREVER);
++    int ret = pinnacle_set_sleep_locked(dev, enabled);
++    k_mutex_unlock(&data->lock);
++    return ret;
++}
+ 
 -    pinnacle_clear_status(dev);
--
++static int pinnacle_init(const struct device *dev) {
++    struct pinnacle_data *data = dev->data;
++    const struct pinnacle_config *config = dev->config;
++    int ret;
+ 
 -    gpio_pin_configure_dt(&config->dr, GPIO_INPUT);
++    data->dev = dev;
++    atomic_set(&data->suspended, 1);
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    atomic_clear(&data->sleep_requested);
++    data->sleep_enabled = false;
++    data->sleep_valid = false;
++    data->wake_needed = false;
++    data->wake_started = false;
++    data->wake_report_pending = false;
++#endif
++    k_mutex_init(&data->lock);
++    k_work_init_delayable(&data->work, pinnacle_work_cb);
++    if (!config->is_ready(dev) || !device_is_ready(config->dr.port)) {
++        LOG_ERR("Pinnacle bus or data-ready GPIO is not ready");
++        return -ENODEV;
++    }
++    ret = gpio_pin_configure_dt(&config->dr, GPIO_INPUT);
++    if (ret < 0) {
++        LOG_ERR("Failed to configure data-ready GPIO: %d", ret);
++        return ret;
++    }
++    ret = set_int(dev, false);
++    if (ret < 0) {
++        return ret;
++    }
++    ret = pinnacle_configure(dev);
++    if (ret < 0) {
++        goto fail;
++    }
      gpio_init_callback(&data->gpio_cb, pinnacle_gpio_cb, BIT(config->dr.pin));
      ret = gpio_add_callback(config->dr.port, &data->gpio_cb);
      if (ret < 0) {
@@ -791,6 +914,12 @@ index d5c7416..2a6fd91 100644
 +        return 0;
      case PM_DEVICE_ACTION_RESUME:
 -        return set_int(dev, true);
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++        /* A failed system suspend can resume devices without an ACTIVE event. */
++        atomic_clear(&data->sleep_requested);
++        data->sleep_valid = false;
++        data->wake_needed = true;
++#endif
 +        ret = set_int(dev, true);
 +        if (ret < 0) {
 +            return ret;
@@ -801,10 +930,12 @@ index d5c7416..2a6fd91 100644
      default:
          return -ENOTSUP;
      }
-@@ -560,16 +735,22 @@ static int pinnacle_pm_action(const struct device *dev, enum pm_device_action ac
+@@ -560,16 +842,24 @@ static int pinnacle_pm_action(const struct device *dev, enum pm_device_action ac
  #endif // IS_ENABLED(CONFIG_PM_DEVICE)
  
  #define PINNACLE_INST(n)                                                                           \
++    BUILD_ASSERT(!IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP) || !DT_INST_PROP(n, sleep),           \
++                 "Use idle sleep or devicetree sleep, not both");                                 \
 +    BUILD_ASSERT(DT_INST_NODE_HAS_PROP(n, dr_gpios), "Pinnacle requires dr-gpios");                  \
 +    BUILD_ASSERT(DT_INST_PROP(n, x_axis_z_min) >= 0 && DT_INST_PROP(n, x_axis_z_min) <= UINT8_MAX,  \
 +                 "x-axis-z-min must fit in a byte");                                              \
@@ -827,7 +958,7 @@ index d5c7416..2a6fd91 100644
          .x_invert = DT_INST_PROP(n, x_invert),                                                     \
          .y_invert = DT_INST_PROP(n, y_invert),                                                     \
 diff --git a/input_pinnacle.h b/input_pinnacle.h
-index ed22e42..0dcd8c7 100644
+index ed22e42..4ad5097 100644
 --- a/input_pinnacle.h
 +++ b/input_pinnacle.h
 @@ -3,6 +3,7 @@
@@ -838,7 +969,7 @@ index ed22e42..0dcd8c7 100644
  
  #define PINNACLE_READ 0xA0
  #define PINNACLE_WRITE 0x80
-@@ -71,13 +72,20 @@
+@@ -71,13 +72,28 @@
  #define PINNACLE_PACKET0_BTN_AUX BIT(2)  // Auxiliary (middle?) button
  #define PINNACLE_PACKET0_X_SIGN BIT(4)   // X delta sign
  #define PINNACLE_PACKET0_Y_SIGN BIT(5)   // Y delta sign
@@ -850,6 +981,14 @@ index ed22e42..0dcd8c7 100644
 -    bool in_int;
 +    uint16_t retry_ms;
 +    atomic_t suspended;
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++    atomic_t sleep_requested;
++    bool sleep_enabled;
++    bool sleep_valid;
++    bool wake_needed;
++    bool wake_started;
++    bool wake_report_pending;
++#endif
 +    struct k_mutex lock;
 +    struct k_work_q work_q;
 +    struct k_work_sync work_sync;
@@ -861,7 +1000,7 @@ index ed22e42..0dcd8c7 100644
  };
  
  enum pinnacle_sensitivity {
-@@ -99,6 +107,7 @@ struct pinnacle_config {
+@@ -99,6 +115,7 @@ struct pinnacle_config {
  
      pinnacle_seq_read_t seq_read;
      pinnacle_write_t write;
@@ -869,3 +1008,11 @@ index ed22e42..0dcd8c7 100644
  
      bool rotate_90, sleep_en, no_taps, no_secondary_tap, x_invert, y_invert;
      enum pinnacle_sensitivity sensitivity;
+@@ -107,3 +124,7 @@ struct pinnacle_config {
+ };
+ 
+ int pinnacle_set_sleep(const struct device *dev, bool enabled);
++
++#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
++int pinnacle_request_sleep(const struct device *dev, bool enabled);
++#endif

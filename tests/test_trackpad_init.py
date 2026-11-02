@@ -102,10 +102,15 @@ DRIVER_CMAKE = r"""
 cmake_minimum_required(VERSION 3.20)
 project(trackpad_driver_order NONE)
 set(CONFIG_INPUT_PINNACLE TRUE)
+set(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP TRUE)
 set(CONFIG_ZMK_TRACKPAD_RELIABLE_SPLIT FALSE)
 file(TO_CMAKE_PATH [[@ROOT@]] repository)
 file(TO_CMAKE_PATH [[@CIRQUE@]] ZEPHYR_CIRQUE_INPUT_MODULE_MODULE_DIR)
 add_custom_target(drivers__input)
+add_custom_target(app)
+function(target_include_directories target visibility directory)
+  set_property(TARGET "${target}" APPEND PROPERTY INCLUDE_DIRECTORIES "${directory}")
+endfunction()
 target_sources(drivers__input PRIVATE before.c
   "${ZEPHYR_CIRQUE_INPUT_MODULE_MODULE_DIR}/drivers/input/input_pinnacle.c" after.c)
 add_subdirectory("${repository}/trackpad" "${CMAKE_BINARY_DIR}/trackpad")
@@ -120,6 +125,12 @@ set(expected "${CMAKE_CURRENT_SOURCE_DIR}/before.c"
              "${CMAKE_CURRENT_SOURCE_DIR}/after.c")
 if(NOT "${actual}" STREQUAL "${expected}")
   message(FATAL_ERROR "Patched driver changed original library source order: ${actual}")
+endif()
+get_target_property(idle_source app SOURCES)
+get_target_property(idle_include app INCLUDE_DIRECTORIES)
+if(NOT "${idle_source}" STREQUAL "${repository}/trackpad/src/trackpad_idle.c"
+   OR NOT "${idle_include}" STREQUAL "${CMAKE_BINARY_DIR}/trackpad/driver")
+  message(FATAL_ERROR "Idle-sleep listener or patched driver header was not registered")
 endif()
 """
 

@@ -174,11 +174,38 @@ for these trackpad changes. An old central cannot decode the new right-half fram
 No bond reset is required. Hardware testing is still needed to validate the complete
 motion path, tapping/dragging, scrolling, congestion recovery, and deep-sleep/wake.
 
-The Cirque driver's ZMK idle-sleep integration is disabled on the right half.
-Upstream [disabled it by default](https://github.com/petejohanson/cirque-input-module/commit/b4c4f8135ed2)
-because wake is unreliable. The trackpad's devicetree `sleep` option is also absent.
-This avoids trackpad sleep transitions during normal operation; ZMK's keyboard-level
-deep sleep remains enabled. Keeping the trackpad awake may increase idle battery use.
+The right half enables local Cirque idle sleep with
+`CONFIG_ZMK_TRACKPAD_IDLE_SLEEP=y`. The upstream idle sleeper remains disabled
+(`CONFIG_ZMK_INPUT_PINNACLE_IDLE_SLEEPER=n`), and the devicetree `sleep` option
+remains absent. The local listener requests sleep changes on the sensor worker;
+register writes are verified and failed I/O is retried with 5-250 ms backoff.
+On idle wake, the driver resets and reinitializes the sensor using the same setup
+as startup, restores the pointer feed, and releases any cached pointer buttons.
+Partial reinitialization remains pending and is retried, even if the sleep-enable
+bit has already cleared. The sensor worker and GPIO callback are not re-created.
+
+Clearing automatic sleep alone and the force-wake/toggle trial did not recover
+the physical trackpad. The subsequent reset/reinitialization diagnostic image
+(SHA-256 beginning `F3DAA94F`) was reported to wake successfully on hardware.
+Production firmware uses that same driver implementation, not either earlier
+sequence. Wake includes calibration: keep the pad untouched while waking with a
+right-half key, then try the pointer. Touch-triggered idle wake may calibrate with
+a finger present and still needs testing; host tests cannot establish analog
+calibration quality or battery savings.
+
+Timeouts and radio power are unchanged: the right half idles after **30 minutes**
+and enters keyboard-level deep sleep after **two hours**, at +8 dBm TX power.
+These are both measured from the last local activity, not added together.
+Deep-sleep wake was also reported working and still uses a fresh boot. Wake it
+with a right-half matrix key, not the trackpad. Each half tracks activity locally;
+typing only on the left does not request right-half wake.
+
+Flash only the right half for this change; its split protocol is unchanged, and
+USB logging or a bond reset is not required. Normal firmware does not include
+the diagnostic image's 10-second idle / 60-second deep-sleep overrides or USB
+logging. Confirm pointer/tap/drag/scroll operation after the production idle and
+deep-sleep timeouts. To avoid the idle-sleep transition if it becomes unreliable,
+set `CONFIG_ZMK_TRACKPAD_IDLE_SLEEP=n`; keyboard-level deep sleep stays enabled.
 
 ### Layer display
 The central mirrors its highest active layer to the peripherals ([layer_sync](layer_sync)),
@@ -219,7 +246,15 @@ interrupts with and without pointer data, and slow input delivery diagnostics. T
 STOP-sequence regression fails against the first version of the trackpad patch.
 It also checks busy-register deadlines, setup/readback failures, readiness, safe
 callback ordering, synchronous cancellation, SPI errors, lost-feed recovery and empty
-frames. [Frame tests](tests/test_trackpad_frames.py) exercise peripheral and central
+frames. Idle-sleep tests compile the driver both enabled and disabled and cover
+repeated idle/active cycles, ignored writes/readback failures, bounded retries,
+pending data without an interrupt edge, suspend rollback, and a fresh boot with a
+sleeping sensor. The sleep model keeps the scanner asleep when only automatic
+sleep is disabled; the wake tests require reset/reinitialization, restored feed
+settings, cached-button release, and retry after partial setup or calibration
+failure. They also compile ZMK's actual activity handler to check the idle
+and deep-sleep timeout boundaries, key/pointer activity, and failed system suspend.
+[Frame tests](tests/test_trackpad_frames.py) exercise peripheral and central
 queue roles, exact 12-byte format, duplicate/wrapping/gapped sequences, the 49/50 ms
 stale-motion boundary, backoff, overflow coalescing and retained button releases.
 [Split tests](tests/test_trackpad_split.py) compile the real patched ZMK proxy and
@@ -240,8 +275,9 @@ release/repress timer races, queue failure cooldowns and disconnect-count satura
 For a right-half USB diagnostic build, use ZMK's existing `zmk-usb-logging` snippet
 (`west build -S zmk-usb-logging`) to supply the CDC UART devicetree node, and add
 `-DEXTRA_CONF_FILE=<repository-root>/trackpad/diagnostics.conf` to its CMake arguments.
-This opt-in configuration enables warning/error-only USB serial logs without the
-per-packet debug stream. Flash that right-half build, connect it to a USB data port,
+This opt-in configuration enables warning/error USB serial logs and informational
+sleep/wake transitions without the per-packet debug stream. Flash that right-half
+build, connect it to a USB data port,
 and open its serial console (115200 baud) to capture a failure. Normal firmware does
 not enable USB logging. With logging enabled, the driver also warns if local input
 delivery takes at least 50 ms; this can expose backpressure between the trackpad and
@@ -291,12 +327,14 @@ split forwarding without changing report delivery or dropping half of an X/Y pai
   which event caused it; `Pinnacle input delivery blocked` records local queue
   backpressure, not a measurement of host cursor latency. Clean logs do not rule
   out a sensor/overlay/grounding problem or loss farther down the split link.
-- Trackpad stops until the right half is power-cycled: the disabled Cirque idle-sleep
-  integration is a mitigation, not a confirmed diagnosis. After flashing the right half,
-  test continuous pointer use, typing/scrolling together, more than 30 minutes idle
-  followed by a right-half keypress and pointer movement, and a battery-powered
-  deep-sleep/wake cycle (more than two hours idle, then wake with a key).
-  If it recurs, record whether right-half keys still work, whether it followed idle
-  or deep sleep, and whether typing on the right half restores the pointer.
-  Working right-half keys with a dead pointer helps distinguish a local trackpad
-  failure from loss of the whole split connection. Do not reset bonds just for this test.
+- Keys wake but the trackpad remains unresponsive after idle: use the current
+  right-half reset/reinitialization firmware, not the earlier sleep-bit-only or
+  force-wake/toggle builds. Idle wake was reported working with the reset-based
+  quick diagnostic image; the normal build restores the 30-minute / two-hour
+  timeouts without USB logging. After more than 30 minutes idle, leave the pad
+  untouched, press a right-half key, and then test movement, tapping/dragging, and
+  layer-3 scrolling. Separately test battery-powered deep sleep (more than two
+  hours idle, then wake with a right-half key).
+  If it recurs, disable `CONFIG_ZMK_TRACKPAD_IDLE_SLEEP` and record whether
+  right-half keys still work and whether a power cycle restores the pointer.
+  Logs are optional, not required for this fallback; do not reset bonds.

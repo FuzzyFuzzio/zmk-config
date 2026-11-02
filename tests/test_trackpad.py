@@ -1,6 +1,6 @@
 """Compile and exercise the patched Cirque driver with simulated I/O.
 
-Set CIRQUE_MODULE_DIR to the cirque-input-module checkout from config/west.yml.
+Set CIRQUE_MODULE_DIR and ZMK_MODULE_DIR to the checkouts from config/west.yml.
 Requires Git and a GCC/Clang-compatible CC, or the ziglang Python package.
 """
 
@@ -35,11 +35,15 @@ STUB = r"""
 #define DT_INST_FOREACH_STATUS_OKAY(...)
 #define CONFIG_INPUT_LOG_LEVEL 0
 #define CONFIG_PM_DEVICE 1
+#ifndef CONFIG_ZMK_TRACKPAD_IDLE_SLEEP
+#define CONFIG_ZMK_TRACKPAD_IDLE_SLEEP 1
+#endif
 #define CONFIG_LOG 1
 #define IS_ENABLED(x) x
 #define LOG_MODULE_REGISTER(...)
 #define LOG_HEXDUMP_DBG(...)
 #define LOG_DBG(...)
+#define LOG_INF(...)
 static int errors, warnings;
 #define LOG_ERR(...) (++errors)
 #define LOG_WRN(...) (++warnings)
@@ -52,6 +56,16 @@ static int errors, warnings;
 #define INPUT_BTN_0 0x110
 #define INPUT_REL_X 0
 #define INPUT_REL_Y 1
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#define DEVICE_DT_GET(node) (&dev)
+#define DT_FOREACH_STATUS_OKAY(compat, fn) fn(trackpad)
+#define ZMK_EV_EVENT_BUBBLE 0
+#define ZMK_LISTENER(...)
+#define ZMK_SUBSCRIPTION(...)
+enum zmk_activity_state { ZMK_ACTIVITY_ACTIVE, ZMK_ACTIVITY_IDLE, ZMK_ACTIVITY_SLEEP };
+typedef struct zmk_activity_state_changed { enum zmk_activity_state state; } zmk_event_t;
+static const struct zmk_activity_state_changed *
+as_zmk_activity_state_changed(const zmk_event_t *event) { return event; }
 
 struct device { const void *config; void *data; };
 struct i2c_dt_spec { int unused; };
@@ -120,7 +134,7 @@ typedef int atomic_t;
 static int atomic_get(const atomic_t *v) { return *v; }
 static void atomic_set(atomic_t *v, int n) { *v = n; }
 static void atomic_clear(atomic_t *v) { *v = 0; }
-static int scheduled_delay, schedules, reschedules, ready_pin, interrupt_error;
+static int scheduled_delay, schedules, reschedules, ready_pin, interrupt_error, schedule_error;
 static struct k_work_delayable *k_work_delayable_from_work(struct k_work *w) {
     return CONTAINER_OF(w, struct k_work_delayable, work);
 }
@@ -134,6 +148,7 @@ static int k_work_schedule(struct k_work_delayable *w, int delay) {
     return 1;
 }
 static int k_work_reschedule(struct k_work_delayable *w, int delay) {
+    if (schedule_error) { return schedule_error; }
     reschedules++; w->pending = 1; scheduled_delay = delay; return 1;
 }
 static int k_work_cancel_delayable(struct k_work_delayable *w) {
@@ -170,6 +185,10 @@ enum pm_device_action { PM_DEVICE_ACTION_SUSPEND, PM_DEVICE_ACTION_RESUME };
 
 static int rel_values[2], rel_reports, key_reports, input_delay_ms;
 static int64_t k_uptime_get(void) { return now_ms; }
+#ifdef TEST_ZMK_ACTIVITY
+struct input_event { int unused; };
+static void activity_input_listener(struct input_event *ev);
+#endif
 static int input_report_rel(const struct device *d, int code, int value, bool sync, int timeout) {
     assert(sync == (code == INPUT_REL_Y));
     now_ms += input_delay_ms;
@@ -180,8 +199,34 @@ static int input_report_key(const struct device *d, int code, int value, bool sy
 }
 """
 
+ACTIVITY_STUB = r"""
+#define CONFIG_ZMK_POINTING 1
+#define CONFIG_ZMK_SLEEP 1
+#define CONFIG_USB_DEVICE_STACK 0
+#define CONFIG_ZMK_IDLE_TIMEOUT 100
+#define CONFIG_ZMK_IDLE_SLEEP_TIMEOUT 200
+#define CONFIG_ZMK_LOG_LEVEL 0
+#define LOG_MODULE_DECLARE(...)
+#define SYS_INIT(...)
+#define INPUT_CALLBACK_DEFINE(...)
+#define K_SECONDS(n) ((n) * 1000)
+#define K_WORK_DEFINE(name, callback) struct k_work name = {.fn = callback}
+#define K_TIMER_DEFINE(name, ...) int name
+struct k_timer { int unused; };
+static void k_timer_start(int *timer, int delay, int period) {}
+static struct k_work *activity_note_submitted;
+static int k_work_submit(struct k_work *work) {
+    activity_note_submitted = work;
+    return 1;
+}
+"""
+
 HARNESS = r"""
 #include "input_pinnacle.c"
+static const struct device dev;
+#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+#include "trackpad_idle.c"
+#endif
 
 static struct pinnacle_data data;
 static uint8_t packet[3], status;
@@ -189,6 +234,9 @@ static int status_error, packet_error, ack_error, acks, reads, race_edge;
 static uint8_t feed_cfg2;
 static uint8_t registers[32], era[512];
 static int fail_read_addr = -1, fail_write_addr = -1, era_busy, cal_busy, readback_bad;
+static bool ignore_sleep_writes, packet_on_wake, fail_sleep_verify, wake_during_sleep_write;
+static bool sensor_sleeping, ignore_feed_writes;
+static int sensor_resets, calibrations;
 static int read_reg(const struct device *dev, uint8_t addr, uint8_t *buf, uint8_t len) {
     reads++;
     if (addr == fail_read_addr) { return -EIO; }
@@ -215,12 +263,36 @@ static int read_reg(const struct device *dev, uint8_t addr, uint8_t *buf, uint8_
 }
 static int write_reg(const struct device *dev, uint8_t addr, uint8_t val) {
     if (addr == fail_write_addr) { return -EIO; }
+    if (addr == PINNACLE_SYS_CFG && !(val & PINNACLE_SYS_CFG_RESET) && ignore_sleep_writes) {
+        return 0;
+    }
+    if (addr == PINNACLE_FEED_CFG1 && ignore_feed_writes) {
+        return 0;
+    }
     registers[addr] = val;
+    if (addr == PINNACLE_SYS_CFG) {
+        if (val & PINNACLE_SYS_CFG_EN_SLEEP) {
+            sensor_sleeping = true;
+        }
+    }
+    if (addr == PINNACLE_SYS_CFG && fail_sleep_verify) {
+        fail_read_addr = PINNACLE_SYS_CFG;
+    }
+#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+    if (addr == PINNACLE_SYS_CFG && (val & PINNACLE_SYS_CFG_EN_SLEEP) &&
+        wake_during_sleep_write) {
+        wake_during_sleep_write = false;
+        assert(pinnacle_request_sleep(dev, false) == 0);
+    }
+#endif
     if (addr == PINNACLE_SYS_CFG && (val & PINNACLE_SYS_CFG_RESET)) {
+        sensor_resets++;
+        sensor_sleeping = false;
         memset(registers, 0, sizeof(registers));
         status = PINNACLE_STATUS1_SW_CC;
     }
     if (addr == PINNACLE_CAL_CFG) {
+        calibrations++;
         registers[addr] &= ~BIT(0);
         status |= PINNACLE_STATUS1_SW_CC;
     }
@@ -244,6 +316,13 @@ static int write_reg(const struct device *dev, uint8_t addr, uint8_t val) {
             pinnacle_gpio_cb(NULL, &data.gpio_cb, 0);
         }
     }
+    if (addr == PINNACLE_FEED_CFG1 && (val & PINNACLE_FEED_CFG1_EN_FEED) &&
+        !sensor_sleeping && packet_on_wake) {
+        packet_on_wake = false;
+        status = PINNACLE_STATUS1_SW_DR;
+        ready_pin = 1;
+        packet[1] = 17;
+    }
     return 0;
 }
 static bool test_bus_ready(const struct device *dev) { return bus_ready; }
@@ -263,6 +342,10 @@ static void reset(void) {
     status_error = packet_error = ack_error = errors = warnings = 0;
     rel_reports = key_reports = acks = reads = race_edge = interrupt_error = 0;
     schedules = reschedules = scheduled_delay = 0;
+    schedule_error = sensor_resets = calibrations = 0;
+    ignore_sleep_writes = packet_on_wake = false;
+    fail_sleep_verify = wake_during_sleep_write = false;
+    sensor_sleeping = ignore_feed_writes = false;
     memset(i2c_registers, 0, sizeof(i2c_registers));
     i2c_read_address = 0;
     i2c_writes = i2c_reads = i2c_bursts = i2c_write_error = i2c_read_error = 0;
@@ -452,6 +535,12 @@ static void test_power_and_init(void) {
     assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_RESUME) == 0);
     assert(!atomic_get(&data.suspended) && data.work.pending && scheduled_delay == 0);
     run_work();
+#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+    assert(sensor_resets == 1 && calibrations == 1 && rel_reports == 0);
+    packet[1] = 1;
+    status = PINNACLE_STATUS1_SW_DR;
+    run_work();
+#endif
     assert(rel_reports == 2);
     reset();
     assert(pinnacle_init(&dev) == 0);
@@ -535,6 +624,237 @@ static void test_faults_and_timeouts(void) {
     assert(registers[PINNACLE_CAL_CFG] == 0);
     assert(key_reports == 1 && rel_reports == 2 && data.btn_cache == 0);
 }
+#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+static void activity(enum zmk_activity_state state) {
+    zmk_event_t event = {.state = state};
+    assert(trackpad_activity_changed(&event) == ZMK_EV_EVENT_BUBBLE);
+}
+static void test_idle_sleep(void) {
+    reset();
+    status = ready_pin = 0;
+    assert(trackpad_activity_changed(NULL) == ZMK_EV_EVENT_BUBBLE);
+    for (int n = 0; n < 20; n++) {
+        int previous_reads = reads;
+        activity(ZMK_ACTIVITY_IDLE);
+        assert(reads == previous_reads && data.work.pending && scheduled_delay == 0);
+        run_work();
+        assert(registers[PINNACLE_SYS_CFG] == PINNACLE_SYS_CFG_EN_SLEEP);
+        assert(data.sleep_enabled && !data.work.pending);
+        assert(sensor_sleeping);
+        activity(ZMK_ACTIVITY_ACTIVE);
+        assert(reads > previous_reads && data.work.pending);
+        run_work();
+        assert(registers[PINNACLE_SYS_CFG] == 0);
+        assert(registers[PINNACLE_FEED_CFG1] == pinnacle_feed_cfg1(&config));
+        assert(registers[PINNACLE_FEED_CFG2] == pinnacle_feed_cfg2(&config));
+        assert(!data.sleep_enabled && !data.work.pending);
+        assert(!sensor_sleeping);
+    }
+    assert(sensor_resets == 20 && calibrations == 20 && worker_starts == 0);
+    assert(rel_reports == 0 && key_reports == 0);
+
+    /* A sample after reinitialization must not require another interrupt edge. */
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    packet_on_wake = true;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(rel_reports == 2 && rel_values[0] == 17 && !data.work.pending);
+
+    /* A touch can leave idle through the normal input activity listener. */
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    status = PINNACLE_STATUS1_SW_DR;
+    packet[1] = 3;
+    pinnacle_gpio_cb(NULL, &data.gpio_cb, 0);
+    run_work();
+    assert(rel_values[0] == 3);
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(!(registers[PINNACLE_SYS_CFG] & PINNACLE_SYS_CFG_EN_SLEEP));
+    reset();
+    status = ready_pin = 0;
+    wake_during_sleep_write = true;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(data.sleep_enabled && data.work.pending && scheduled_delay == 0);
+    run_work();
+    assert(!data.sleep_enabled && !data.work.pending);
+}
+static void test_sleep_failures(void) {
+    reset();
+    status = ready_pin = 0;
+    fail_sleep_verify = true;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(registers[PINNACLE_SYS_CFG] & PINNACLE_SYS_CFG_EN_SLEEP);
+    assert(!data.sleep_enabled && !data.sleep_valid && data.work.pending);
+    fail_sleep_verify = false;
+    fail_read_addr = -1;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(registers[PINNACLE_SYS_CFG] == 0);
+    assert(data.sleep_valid && !data.wake_needed && !data.work.pending && !sensor_sleeping);
+    for (int waking = 0; waking < 2; waking++) {
+        for (int failure = 0; failure < 4; failure++) {
+            reset();
+            status = ready_pin = 0;
+            if (waking) {
+                activity(ZMK_ACTIVITY_IDLE);
+                run_work();
+            }
+            switch (failure) {
+            case 0: fail_read_addr = PINNACLE_SYS_CFG; break;
+            case 1: fail_write_addr = PINNACLE_SYS_CFG; break;
+            case 2:
+                ignore_sleep_writes = !waking;
+                ignore_feed_writes = waking;
+                break;
+            case 3: registers[PINNACLE_SYS_CFG] = 0xff; break;
+            }
+            activity(waking ? ZMK_ACTIVITY_ACTIVE : ZMK_ACTIVITY_IDLE);
+            for (int n = 0; n < 10; n++) { run_work(); }
+            assert(errors > 0 && scheduled_delay == 250 && data.work.pending);
+            assert(data.sleep_enabled == !!waking);
+            fail_read_addr = fail_write_addr = -1;
+            ignore_sleep_writes = ignore_feed_writes = false;
+            registers[PINNACLE_SYS_CFG] = waking ? PINNACLE_SYS_CFG_EN_SLEEP : 0;
+            run_work();
+            assert(data.sleep_enabled == !waking && !data.work.pending);
+        }
+    }
+    reset();
+    status = ready_pin = 0;
+    fail_write_addr = PINNACLE_SYS_CFG;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(scheduled_delay == 5);
+    fail_write_addr = -1;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(!data.sleep_enabled && !data.work.pending);
+    reset();
+    schedule_error = -EBUSY;
+    assert(pinnacle_request_sleep(&dev, true) == -EBUSY && errors == 1);
+    activity(ZMK_ACTIVITY_IDLE);
+    assert(errors == 3);
+    reset();
+    gpio_ready = false;
+    activity(ZMK_ACTIVITY_IDLE);
+    assert(errors == 1 && !data.work.pending);
+}
+static void test_partial_wake_reinitialization(void) {
+    reset();
+    status = ready_pin = 0;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(sensor_sleeping);
+    fail_write_addr = PINNACLE_FEED_CFG1;
+    packet_on_wake = true;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(!(registers[PINNACLE_SYS_CFG] & PINNACLE_SYS_CFG_EN_SLEEP));
+    assert(!sensor_sleeping && !data.sleep_valid && data.wake_needed && data.wake_started);
+    assert(errors > 0 && data.work.pending && scheduled_delay == 5 && rel_reports == 0);
+    for (int n = 0; n < 10; n++) { run_work(); }
+    assert(scheduled_delay == 250 && data.wake_started);
+    fail_write_addr = -1;
+    run_work();
+    assert(!sensor_sleeping && data.sleep_valid && !data.wake_needed && !data.work.pending);
+    assert(rel_reports == 2 && rel_values[0] == 17);
+    assert(sensor_resets > 1 && calibrations == sensor_resets && worker_starts == 0);
+}
+static void test_wake_reinitialization_failures(void) {
+    for (int failure = 0; failure < 7; failure++) {
+        reset();
+        status = ready_pin = 0;
+        activity(ZMK_ACTIVITY_IDLE);
+        run_work();
+        switch (failure) {
+        case 0: fail_read_addr = PINNACLE_FW_ID; break;
+        case 1: status_error = -EIO; break;
+        case 2: fail_write_addr = PINNACLE_FEED_CFG2; break;
+        case 3: cal_busy = 1; break;
+        case 4: readback_bad = 1; break;
+        case 5: fail_write_addr = PINNACLE_REG_ERA_VALUE; break;
+        case 6: fail_read_addr = PINNACLE_REG_ERA_CONTROL; break;
+        }
+        activity(ZMK_ACTIVITY_ACTIVE);
+        run_work();
+        assert(errors > 0 && data.wake_started && !data.sleep_valid);
+        assert(data.work.pending && scheduled_delay == 5 && rel_reports == 0);
+        fail_read_addr = fail_write_addr = -1;
+        status_error = cal_busy = readback_bad = 0;
+        run_work();
+        assert(!data.sleep_enabled && data.sleep_valid && !data.wake_started);
+        assert(!data.work.pending && registers[PINNACLE_SYS_CFG] == 0);
+    }
+    reset();
+    status = ready_pin = 0;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    data.btn_cache = PINNACLE_PACKET0_BTN_PRIM;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(key_reports == 1 && data.btn_cache == 0 && rel_reports == 2);
+    assert(sensor_resets == 1 && calibrations == 1 && data.wake_report_pending);
+    packet[1] = 9;
+    status = PINNACLE_STATUS1_SW_DR;
+    run_work();
+    assert(rel_values[0] == 9 && !data.wake_report_pending);
+}
+static void test_sleep_suspend_and_boot(void) {
+    reset();
+    status = ready_pin = 0;
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    activity(ZMK_ACTIVITY_SLEEP);
+    assert(!data.work.pending);
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_SUSPEND) == 0);
+    int suspended_reads = reads;
+    activity(ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(reads == suspended_reads && data.sleep_enabled);
+    /* PM rollback must wake even if no ACTIVE event was delivered. */
+    atomic_set(&data.sleep_requested, 1);
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_RESUME) == 0);
+    fail_write_addr = PINNACLE_SYS_CFG;
+    run_work();
+    assert(data.work.pending && scheduled_delay == 5 && data.sleep_enabled);
+    fail_write_addr = -1;
+    packet_on_wake = true;
+    run_work();
+    assert(!data.sleep_enabled && rel_values[0] == 17);
+
+    /* nRF52840 system-off wake reboots with the sensor potentially still powered. */
+    activity(ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_SUSPEND) == 0);
+    int previous_resets = sensor_resets, previous_calibrations = calibrations;
+    memset(&data, 0, sizeof(data));
+    assert(registers[PINNACLE_SYS_CFG] & PINNACLE_SYS_CFG_EN_SLEEP);
+    assert(pinnacle_init(&dev) == 0);
+    assert(sensor_resets == previous_resets + 1 && calibrations == previous_calibrations + 1);
+    assert(!data.sleep_enabled && !atomic_get(&data.sleep_requested));
+    assert(registers[PINNACLE_SYS_CFG] == 0 && irq_enabled && data.work.pending);
+    packet[1] = 29;
+    status = PINNACLE_STATUS1_SW_DR;
+    ready_pin = 1;
+    run_work();
+    assert(rel_values[0] == 29 && !data.work.pending);
+
+    reset();
+    status = ready_pin = 0;
+    run_work();
+    assert(data.sleep_valid && !data.sleep_enabled);
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_SUSPEND) == 0);
+    registers[PINNACLE_SYS_CFG] = PINNACLE_SYS_CFG_EN_SLEEP;
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_RESUME) == 0);
+    run_work();
+    assert(registers[PINNACLE_SYS_CFG] == 0);
+    assert(data.sleep_valid && !data.wake_needed && !data.work.pending && !sensor_sleeping);
+}
+#endif
 int main(void) {
     test_i2c_protocol();
     test_deltas();
@@ -543,8 +863,102 @@ int main(void) {
     test_edges_and_buttons();
     test_power_and_init();
     test_faults_and_timeouts();
+#if IS_ENABLED(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+    test_idle_sleep();
+    test_sleep_failures();
+    test_partial_wake_reinitialization();
+    test_wake_reinitialization_failures();
+    test_sleep_suspend_and_boot();
+#endif
     puts("Trackpad checks passed: decoding, recovery, edges, buttons, PM and init");
     return 0;
+}
+"""
+
+ACTIVITY_HARNESS = r"""
+static bool powered_off, fail_system_suspend;
+static int raise_zmk_activity_state_changed(struct zmk_activity_state_changed event) {
+    return trackpad_activity_changed(&event);
+}
+static int zmk_pm_suspend_devices(void) {
+    int ret = pinnacle_pm_action(&dev, PM_DEVICE_ACTION_SUSPEND);
+    return ret < 0 ? ret : fail_system_suspend ? -EIO : 0;
+}
+static void zmk_pm_resume_devices(void) {
+    assert(pinnacle_pm_action(&dev, PM_DEVICE_ACTION_RESUME) == 0);
+}
+static void sys_poweroff(void) { powered_off = true; }
+#include "activity.c"
+
+static void reset_activity(void) {
+    reset();
+    status = ready_pin = 0;
+    activity_state = ZMK_ACTIVITY_ACTIVE;
+    activity_note_submitted = NULL;
+    powered_off = fail_system_suspend = false;
+    activity_init();
+}
+static void test_real_activity_wake(void) {
+    reset_activity();
+    now_ms = 100;
+    activity_work_handler(NULL);
+    assert(zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE && !data.work.pending);
+    now_ms = 101;
+    activity_work_handler(NULL);
+    assert(zmk_activity_get_state() == ZMK_ACTIVITY_IDLE);
+    run_work();
+    assert(data.sleep_enabled);
+    activity_event_listener(NULL);
+    assert(zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE);
+    run_work();
+    assert(!data.sleep_enabled);
+
+    now_ms += 101;
+    activity_work_handler(NULL);
+    run_work();
+    packet[1] = 8;
+    status = PINNACLE_STATUS1_SW_DR;
+    run_work();
+    struct input_event input = {0};
+    activity_input_listener(&input);
+    assert(activity_note_submitted);
+    activity_note_submitted->fn(activity_note_submitted);
+    run_work();
+    assert(zmk_activity_get_state() == ZMK_ACTIVITY_ACTIVE && !data.sleep_enabled);
+
+    now_ms += 101;
+    activity_work_handler(NULL);
+    run_work();
+    assert(data.sleep_enabled);
+    now_ms = activity_last_uptime + MAX_SLEEP_MS;
+    activity_work_handler(NULL);
+    assert(!powered_off && zmk_activity_get_state() == ZMK_ACTIVITY_IDLE);
+    now_ms += 1;
+    activity_work_handler(NULL);
+    assert(powered_off && zmk_activity_get_state() == ZMK_ACTIVITY_SLEEP);
+    assert(atomic_get(&data.suspended) && data.sleep_enabled && !data.work.pending);
+    memset(&data, 0, sizeof(data));
+    activity_state = ZMK_ACTIVITY_ACTIVE;
+    assert(pinnacle_init(&dev) == 0);
+    assert(!data.sleep_enabled && registers[PINNACLE_SYS_CFG] == 0);
+    assert(irq_enabled && data.work.pending);
+    packet[1] = 21;
+    status = PINNACLE_STATUS1_SW_DR;
+    run_work();
+    assert(rel_values[0] == 21);
+
+    reset_activity();
+    now_ms = 101;
+    activity_work_handler(NULL);
+    run_work();
+    fail_system_suspend = true;
+    now_ms = 201;
+    activity_work_handler(NULL);
+    assert(!powered_off && zmk_activity_get_state() == ZMK_ACTIVITY_SLEEP);
+    assert(!atomic_get(&data.suspended) && data.work.pending);
+    run_work();
+    assert(!data.sleep_enabled && registers[PINNACLE_SYS_CFG] == 0);
+    assert(!sensor_sleeping);
 }
 """
 
@@ -552,11 +966,20 @@ HEADERS = (
     "zephyr/device.h", "zephyr/drivers/i2c.h", "zephyr/drivers/spi.h",
     "zephyr/sys/atomic.h", "zephyr/dt-bindings/input/input-event-codes.h",
     "zephyr/init.h", "zephyr/input/input.h", "zephyr/pm/device.h", "zephyr/logging/log.h",
+    "zephyr/devicetree.h", "zmk/event_manager.h", "zmk/events/activity_state_changed.h",
+    "zephyr/kernel.h", "zephyr/sys/poweroff.h", "zmk/events/position_state_changed.h",
+    "zmk/events/sensor_event.h", "zmk/pm.h", "zmk/activity.h",
 )
 
 
 class TrackpadTests(unittest.TestCase):
     def test_patched_driver(self):
+        self.run_driver(activity_integration=False)
+
+    def test_real_activity_sleep_wake(self):
+        self.run_driver(activity_integration=True)
+
+    def run_driver(self, activity_integration):
         module = os.environ.get("CIRQUE_MODULE_DIR")
         if not module:
             self.fail("Set CIRQUE_MODULE_DIR to the pinned cirque-input-module checkout")
@@ -577,6 +1000,7 @@ class TrackpadTests(unittest.TestCase):
             temp.mkdir()
             for name in ("input_pinnacle.c", "input_pinnacle.h"):
                 shutil.copyfile(Path(module) / "drivers" / "input" / name, temp / name)
+            shutil.copyfile(ROOT / "trackpad" / "src" / "trackpad_idle.c", temp / "trackpad_idle.c")
             patch = subprocess.run(
                 [
                     "git", "--work-tree=" + str(temp), "apply",
@@ -585,26 +1009,39 @@ class TrackpadTests(unittest.TestCase):
                 cwd=temp, capture_output=True, text=True,
             )
             self.assertEqual(patch.returncode, 0, patch.stdout + patch.stderr)
-            (temp / "stubs.h").write_text(STUB, encoding="ascii")
-            (temp / "test.c").write_text(HARNESS, encoding="ascii")
+            stub, harness = STUB, HARNESS
+            if activity_integration:
+                zmk = os.environ.get("ZMK_MODULE_DIR")
+                self.assertTrue(zmk, "Set ZMK_MODULE_DIR to the pinned ZMK checkout")
+                shutil.copyfile(Path(zmk) / "app" / "src" / "activity.c", temp / "activity.c")
+                stub += ACTIVITY_STUB
+                harness = harness.replace("int main(void) {", ACTIVITY_HARNESS + """
+int main(void) {
+    test_real_activity_wake();
+""")
+            (temp / "stubs.h").write_text(stub, encoding="ascii")
+            (temp / "test.c").write_text(harness, encoding="ascii")
             for name in HEADERS:
                 header = temp.joinpath(*name.split("/"))
                 header.parent.mkdir(parents=True, exist_ok=True)
                 header.write_text("", encoding="ascii")
             executable = temp / ("trackpad.exe" if os.name == "nt" else "trackpad")
-            build = subprocess.run(
-                compiler + [
-                    "-std=c11", "-Wall", "-Wextra", "-Werror",
-                    "-Wno-unused-parameter", "-Wno-unused-function",
-                    "-include", str(temp / "stubs.h"), "-I", str(temp),
-                    str(temp / "test.c"), "-o", str(executable),
-                ],
-                capture_output=True, text=True,
-            )
-            self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
-            result = subprocess.run([str(executable)], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("Trackpad checks passed", result.stdout)
+            for idle_sleep in ((1,) if activity_integration else (0, 1)):
+                with self.subTest(idle_sleep=idle_sleep):
+                    build = subprocess.run(
+                        compiler + (["-DTEST_ZMK_ACTIVITY"] if activity_integration else []) + [
+                            f"-DCONFIG_ZMK_TRACKPAD_IDLE_SLEEP={idle_sleep}",
+                            "-std=c11", "-Wall", "-Wextra", "-Werror",
+                            "-Wno-unused-parameter", "-Wno-unused-function",
+                            "-include", str(temp / "stubs.h"), "-I", str(temp),
+                            str(temp / "test.c"), "-o", str(executable),
+                        ],
+                        capture_output=True, text=True,
+                    )
+                    self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
+                    result = subprocess.run([str(executable)], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("Trackpad checks passed", result.stdout)
 
 
 if __name__ == "__main__":

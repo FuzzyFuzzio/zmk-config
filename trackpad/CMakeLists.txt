@@ -76,6 +76,11 @@ if(CONFIG_INPUT_PINNACLE)
   list(REMOVE_AT input_sources ${index})
   list(INSERT input_sources ${index} "${patched}/input_pinnacle.c")
   set_property(TARGET drivers__input PROPERTY SOURCES "${input_sources}")
+
+  if(CONFIG_ZMK_TRACKPAD_IDLE_SLEEP)
+    target_sources(app PRIVATE src/trackpad_idle.c)
+    target_include_directories(app PRIVATE "${patched}")
+  endif()
 endif()
 
 if(CONFIG_ZMK_TRACKPAD_RELIABLE_SPLIT)
